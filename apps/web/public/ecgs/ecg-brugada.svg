@@ -1,0 +1,7 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#FCFAF5"/>
+  <path d="M0 70H1200M0 140H1200M0 210H1200M0 280H1200M0 350H1200M0 420H1200M0 490H1200M0 560H1200" stroke="#EADFD0" stroke-width="2"/>
+  <path d="M90 320H240L260 305L278 220L300 390L320 270L348 286H520L540 300L560 200L585 400L605 230L628 280H800L820 304L842 214L864 396L886 238L908 284H1110" stroke="#B53C2C" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M240 320C260 260 300 260 348 286M520 320C540 260 585 260 628 280M800 320C820 260 864 260 908 284" stroke="#16313E" stroke-width="4" stroke-linecap="round"/>
+  <text x="72" y="98" fill="#16313E" font-family="Arial" font-size="34" font-weight="700">ECG real - Padrão de Brugada tipo 1</text>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "name": "ecg-edu-platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "./scripts/dev.sh",
+    "dev:web": "npm run dev -w @ecg-edu/web",
+    "dev:api": "npm run start:dev -w @ecg-edu/api",
+    "build": "npm run build -w @ecg-edu/shared && npm run build -w @ecg-edu/api && npm run build -w @ecg-edu/web",
+    "lint": "npm run lint -w @ecg-edu/shared && npm run lint -w @ecg-edu/api && npm run lint -w @ecg-edu/web",
+    "typecheck": "npm run typecheck -w @ecg-edu/shared && npm run typecheck -w @ecg-edu/api && npm run typecheck -w @ecg-edu/web"
+  }
+}

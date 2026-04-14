@@ -1,0 +1,6 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#FCFAF5"/>
+  <path d="M0 70H1200M0 140H1200M0 210H1200M0 280H1200M0 350H1200M0 420H1200M0 490H1200M0 560H1200" stroke="#EADFD0" stroke-width="2"/>
+  <path d="M90 320H180L200 300L212 330L232 318H350L372 310L392 250L406 386L430 252L450 310H620L640 300L660 250L680 392L704 248L724 300H910L934 294L956 252L974 390L996 250L1016 312H1120" stroke="#B53C2C" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="72" y="98" fill="#16313E" font-family="Arial" font-size="34" font-weight="700">ECG real - IAM com supra inferior</text>
+</svg>

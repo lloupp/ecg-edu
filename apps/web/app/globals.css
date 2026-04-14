@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: Fraunces, Alegreya, Georgia, serif;
+  --font-sans: Manrope, "IBM Plex Sans", "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  background-image:
+    radial-gradient(circle at top left, rgba(181, 60, 44, 0.14), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(22, 49, 62, 0.14), transparent 28%);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b53c2c #ebe4d8;
+}
