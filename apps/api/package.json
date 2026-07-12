@@ -6,7 +6,9 @@
     "start:dev": "nest start --watch",
     "build": "tsc -p tsconfig.build.json",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:e2e": "jest --testPathPattern test/e2e"
   },
   "dependencies": {
     "@ecg-edu/shared": "0.0.1",
@@ -22,8 +24,26 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
+    "@types/jest": "^29.5.14",
     "@types/node": "^22.10.2",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": ".",
+    "testRegex": "test/.*\\.(e2e-)?spec\\.ts$",
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", { "isolatedModules": true }]
+    },
+    "moduleNameMapper": {
+      "^@ecg-edu/shared$": "<rootDir>/../../packages/shared/src"
+    },
+    "testEnvironment": "node",
+    "collectCoverageFrom": ["src/**/*.ts"]
   }
 }
