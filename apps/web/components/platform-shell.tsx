@@ -160,30 +160,27 @@ export function PlatformShell() {
     const session = await api.startSession({
       teacherId: user.id,
       title: liveTitle,
-      questionIds: cases.slice(0, 3).map((item) => questionIdByCase(item.id)).filter(Boolean) as string[],
+      questionIds: cases.slice(0, 3).map((item) => item.liveQuestionId).filter((id): id is string => Boolean(id)),
     });
     setSelectedSessionCode(session.code);
     setStatusMessage(`Sessão criada com código ${session.code}.`);
     await refreshAll();
   }
 
-  function questionIdByCase(caseId: string) {
-    const mapping = {
-      'case-af': 'q-af',
-      'case-stemi': 'q-stemi',
-      'case-brugada': 'q-brugada',
-    } as Record<string, string>;
-    return mapping[caseId];
-  }
-
   async function activateSession(code: string) {
-    await api.activateSession(code);
+    if (!user) {
+      return;
+    }
+    await api.activateSession(code, user.id);
     setStatusMessage(`Sessão ${code} iniciada.`);
     await refreshAll();
   }
 
   async function nextSessionQuestion(code: string) {
-    await api.nextSessionQuestion(code);
+    if (!user) {
+      return;
+    }
+    await api.nextSessionQuestion(code, user.id);
     await refreshAll();
   }
 

@@ -13,6 +13,7 @@ export interface UserProfile {
 
 export interface ClinicalCase {
   id: string;
+  liveQuestionId?: string;
   title: string;
   ecgImageUrl: string;
   clinicalDescription: string;

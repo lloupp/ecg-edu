@@ -16,6 +16,16 @@ export class JoinSessionDto {
   name!: string;
 }
 
+export class ActivateSessionDto {
+  @IsString()
+  teacherId!: string;
+}
+
+export class AdvanceSessionDto {
+  @IsString()
+  teacherId!: string;
+}
+
 export class AnswerSessionDto {
   @IsString()
   participantId!: string;

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { AnswerSessionDto, JoinSessionDto, StartSessionDto } from './live.dto';
+import { AnswerSessionDto, ActivateSessionDto, AdvanceSessionDto, JoinSessionDto, StartSessionDto } from './live.dto';
 import { LiveService } from './live.service';
 
 @Controller('live')
@@ -22,8 +22,8 @@ export class LiveController {
   }
 
   @Post('sessions/:code/activate')
-  activate(@Param('code') code: string) {
-    return this.liveService.activate(code);
+  activate(@Param('code') code: string, @Body() payload: ActivateSessionDto) {
+    return this.liveService.activate(code, payload.teacherId);
   }
 
   @Post('sessions/:code/answer')
@@ -32,7 +32,7 @@ export class LiveController {
   }
 
   @Post('sessions/:code/next')
-  advance(@Param('code') code: string) {
-    return this.liveService.advance(code);
+  advance(@Param('code') code: string, @Body() payload: AdvanceSessionDto) {
+    return this.liveService.advance(code, payload.teacherId);
   }
 }

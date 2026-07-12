@@ -11,11 +11,12 @@ import {
 } from '@ecg-edu/shared';
 import { casesSeed, questionsSeed, usersSeed } from './mock-data';
 
-class InMemoryDatabase {
+export class InMemoryDatabase {
   users: UserProfile[] = structuredClone(usersSeed);
   cases: ClinicalCase[] = structuredClone(casesSeed);
   questions: LiveQuestion[] = structuredClone(questionsSeed);
   sessions: LiveSession[] = [];
+  private trainingOrder: string[] | null = null;
 
   login(email: string, role: UserRole): UserProfile {
     const normalized = email.trim().toLowerCase();
@@ -49,10 +50,11 @@ class InMemoryDatabase {
   }
 
   createCase(payload: Omit<ClinicalCase, 'id'>): ClinicalCase {
-    const created = { ...payload, id: randomUUID() };
+    const questionId = randomUUID();
+    const created: ClinicalCase = { ...payload, id: randomUUID(), liveQuestionId: questionId };
     this.cases.unshift(created);
     this.questions.push({
-      id: randomUUID(),
+      id: questionId,
       caseId: created.id,
       prompt: `Qual o melhor diagnóstico para o caso ${created.title}?`,
       options: [created.diagnosis, 'Pericardite aguda', 'Taquicardia sinusal', 'ECG normal'],
@@ -78,7 +80,10 @@ class InMemoryDatabase {
   }
 
   metrics(): DashboardMetrics {
-    const activeStudents = this.sessions.flatMap((session) => session.participants).filter((user) => user.role === 'student').length;
+    const activeStudents = this.sessions
+      .filter((session) => session.status !== 'finished')
+      .flatMap((session) => session.participants)
+      .filter((participant) => participant.role === 'student').length;
     return {
       totalCases: this.cases.length,
       liveSessions: this.sessions.filter((session) => session.status !== 'finished').length,
@@ -180,8 +185,22 @@ class InMemoryDatabase {
     return this.questions.find((item) => item.id === session.questionIds[session.currentQuestionIndex]);
   }
 
+  private shuffledQuestionIds(): string[] {
+    if (!this.trainingOrder || this.trainingOrder.length !== this.questions.length) {
+      const ids = this.questions.map((item) => item.id);
+      for (let i = ids.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      this.trainingOrder = ids;
+    }
+    return this.trainingOrder;
+  }
+
   nextTrainingQuestion(index: number): { question: LiveQuestion; caseData: ClinicalCase } {
-    const question = this.questions[index % this.questions.length];
+    const order = this.shuffledQuestionIds();
+    const safeIndex = ((index % order.length) + order.length) % order.length;
+    const question = this.questions.find((item) => item.id === order[safeIndex])!;
     const caseData = this.cases.find((item) => item.id === question.caseId)!;
     return { question, caseData };
   }
@@ -192,10 +211,11 @@ class InMemoryDatabase {
       return undefined;
     }
     const caseData = this.cases.find((item) => item.id === question.caseId)!;
+    const normalize = (value: string) => value.trim().toLowerCase();
     return {
       questionId,
       selectedAnswer,
-      isCorrect: selectedAnswer === question.correctAnswer,
+      isCorrect: normalize(selectedAnswer) === normalize(question.correctAnswer),
       explanation: caseData.explanation,
     };
   }

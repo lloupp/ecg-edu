@@ -30,6 +30,7 @@ export const usersSeed: UserProfile[] = [
 export const casesSeed: ClinicalCase[] = [
   {
     id: 'case-af',
+    liveQuestionId: 'q-af',
     title: 'FA com resposta ventricular rápida',
     ecgImageUrl: '/ecgs/ecg-af.svg',
     clinicalDescription: 'Paciente de 72 anos com palpitações súbitas, dispneia leve e histórico de hipertensão arterial.',
@@ -42,6 +43,7 @@ export const casesSeed: ClinicalCase[] = [
   },
   {
     id: 'case-stemi',
+    liveQuestionId: 'q-stemi',
     title: 'IAM com supra de parede inferior',
     ecgImageUrl: '/ecgs/ecg-stemi.svg',
     clinicalDescription: 'Homem de 58 anos com dor torácica opressiva há 40 minutos, sudorese e náuseas.',
@@ -54,6 +56,7 @@ export const casesSeed: ClinicalCase[] = [
   },
   {
     id: 'case-brugada',
+    liveQuestionId: 'q-brugada',
     title: 'Padrão de Brugada tipo 1',
     ecgImageUrl: '/ecgs/ecg-brugada.svg',
     clinicalDescription: 'Paciente de 34 anos com síncope noturna e antecedente familiar de morte súbita.',
