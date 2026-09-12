@@ -2,6 +2,17 @@
 
 Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
+## [0.2.1] - 2026-09-12
+### Corrigido
+- Integridade de pontuação na aula ao vivo: `POST /live/sessions/:code/answer` agora rejeita respostas
+  fora da rodada ativa (lobby/finalizada) e respostas repetidas do mesmo participante na mesma rodada,
+  eliminando a inflação de pontuação por reenvio.
+- `POST /live/sessions/:code/activate` agora só é aceito a partir do estado `lobby`, impedindo que o
+  professor reative uma rodada já ativa e zere as respostas de uma pergunta já pontuada (reabrindo a
+  pontuação para a mesma pergunta).
+- Frontend: oculta as opções de resposta fora da rodada ativa/já respondida e desabilita "Iniciar rodada"
+  fora do estado `lobby`; mensagens de erro da API agora exibem o texto real em vez do corpo JSON bruto.
+
 ## [0.2.0] - 2026-07-12
 ### Adicionado
 - Testes unitários (services/db) e e2e (fluxo crítico) com Jest + supertest.
