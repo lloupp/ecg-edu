@@ -42,8 +42,8 @@ export class LiveService {
     if (session.teacherId !== teacherId) {
       throw new ForbiddenException('Apenas o professor dono pode iniciar a rodada');
     }
-    if (session.status === 'finished') {
-      throw new BadRequestException('Sessão já finalizada');
+    if (session.status !== 'lobby') {
+      throw new BadRequestException('Rodada já iniciada ou sessão finalizada');
     }
     const updated = db.activateSession(code)!;
     return {
@@ -53,10 +53,17 @@ export class LiveService {
   }
 
   answer(code: string, payload: AnswerSessionDto) {
-    const session = db.submitAnswer(code, payload.participantId, payload.answer);
-    if (!session) {
+    const existing = db.findSessionByCode(code);
+    if (!existing) {
       throw new NotFoundException('Sessão não encontrada');
     }
+    if (existing.status !== 'active') {
+      throw new BadRequestException('A rodada não está ativa');
+    }
+    if (existing.answers[payload.participantId] !== undefined) {
+      throw new ConflictException('Resposta já registrada para esta rodada');
+    }
+    const session = db.submitAnswer(code, payload.participantId, payload.answer)!;
     return {
       ...session,
       currentQuestion: db.currentQuestion(session),

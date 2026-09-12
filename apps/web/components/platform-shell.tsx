@@ -171,8 +171,12 @@ export function PlatformShell() {
     if (!user) {
       return;
     }
-    await api.activateSession(code, user.id);
-    setStatusMessage(`Sessão ${code} iniciada.`);
+    try {
+      await api.activateSession(code, user.id);
+      setStatusMessage(`Sessão ${code} iniciada.`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'Falha ao iniciar rodada');
+    }
     await refreshAll();
   }
 
@@ -197,8 +201,12 @@ export function PlatformShell() {
     if (!selectedSession || !joinedParticipantId) {
       return;
     }
-    await api.answerSession(selectedSession.code, joinedParticipantId, answer);
-    setStatusMessage('Resposta enviada.');
+    try {
+      await api.answerSession(selectedSession.code, joinedParticipantId, answer);
+      setStatusMessage('Resposta enviada.');
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'Falha ao enviar resposta');
+    }
     await refreshAll();
   }
 
@@ -214,6 +222,7 @@ export function PlatformShell() {
     () => sessions.find((session) => session.code === selectedSessionCode) ?? sessions[0],
     [selectedSessionCode, sessions],
   );
+  const hasAnsweredCurrentRound = Boolean(joinedParticipantId && selectedSession?.answers[joinedParticipantId] !== undefined);
 
   const teacherList = users.filter((item) => item.role === 'teacher');
   const contributorCases = cases.filter((item) => item.status === 'pending_review');
@@ -465,19 +474,27 @@ export function PlatformShell() {
                       </div>
                       <p className="mt-4 text-sm text-foreground/70">Pergunta atual: {selectedSession.currentQuestion?.prompt ?? 'Sem pergunta carregada'}</p>
                       <div className="mt-4 flex flex-wrap gap-3">
-                        <Button variant="accent" onClick={() => void activateSession(selectedSession.code)} disabled={user.role !== 'teacher'}>Iniciar rodada</Button>
+                        <Button variant="accent" onClick={() => void activateSession(selectedSession.code)} disabled={user.role !== 'teacher' || selectedSession.status !== 'lobby'}>Iniciar rodada</Button>
                         <Button variant="outline" onClick={() => void nextSessionQuestion(selectedSession.code)} disabled={user.role !== 'teacher'}>Próxima pergunta</Button>
                       </div>
                     </div>
                     {selectedSession.currentQuestion ? (
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {selectedSession.currentQuestion.options.map((option) => (
-                          <button key={option} className="rounded-3xl border border-border bg-card p-4 text-left transition hover:border-secondary" onClick={() => void submitLiveAnswer(option)}>
-                            <p className="font-semibold text-secondary">{option}</p>
-                            <p className="mt-2 text-sm text-foreground/65">Enviar como resposta do participante conectado.</p>
-                          </button>
-                        ))}
-                      </div>
+                      selectedSession.status === 'finished' ? (
+                        <p className="rounded-3xl bg-muted p-4 text-sm text-foreground/70">Sessão encerrada.</p>
+                      ) : selectedSession.status !== 'active' ? (
+                        <p className="rounded-3xl bg-muted p-4 text-sm text-foreground/70">Aguardando o professor iniciar a rodada.</p>
+                      ) : hasAnsweredCurrentRound ? (
+                        <p className="rounded-3xl bg-muted p-4 text-sm text-foreground/70">Resposta enviada para esta rodada. Aguarde o professor avançar.</p>
+                      ) : (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {selectedSession.currentQuestion.options.map((option) => (
+                            <button key={option} className="rounded-3xl border border-border bg-card p-4 text-left transition hover:border-secondary" onClick={() => void submitLiveAnswer(option)}>
+                              <p className="font-semibold text-secondary">{option}</p>
+                              <p className="mt-2 text-sm text-foreground/65">Enviar como resposta do participante conectado.</p>
+                            </button>
+                          ))}
+                        </div>
+                      )
                     ) : null}
                     <div>
                       <p className="font-semibold text-secondary">Ranking</p>

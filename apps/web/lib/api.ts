@@ -2,6 +2,18 @@ import { ClinicalCase, DashboardMetrics, LiveSession, LoginPayload, TrainingAtte
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
+function extractErrorMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { message?: string | string[] };
+    if (Array.isArray(parsed.message)) {
+      return parsed.message.join(', ');
+    }
+    return parsed.message ?? body;
+  } catch {
+    return body;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -13,8 +25,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Erro ao comunicar com a API');
+    const body = await response.text();
+    throw new Error(extractErrorMessage(body) || 'Erro ao comunicar com a API');
   }
 
   return response.json() as Promise<T>;

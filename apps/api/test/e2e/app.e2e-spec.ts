@@ -53,4 +53,36 @@ describe('ECG Edu API (e2e)', () => {
       .send({ teacherId: 'intruso' });
     expect(res.status).toBe(403);
   });
+
+  it('impede pontuação indevida em /live/sessions/:code/answer (rodada não ativa e resposta duplicada)', async () => {
+    const start = await request(app.getHttpServer())
+      .post('/api/live/sessions')
+      .send({ teacherId: 'u-teacher-1', title: 'Aula', questionIds: ['q-af'] });
+    const code = start.body.code;
+
+    const join = await request(app.getHttpServer()).post(`/api/live/sessions/${code}/join`).send({ name: 'Aluno' });
+    const participantId = join.body.participants.find((p: { name: string }) => p.name === 'Aluno').id;
+
+    const beforeActivation = await request(app.getHttpServer())
+      .post(`/api/live/sessions/${code}/answer`)
+      .send({ participantId, answer: 'Fibrilação atrial' });
+    expect(beforeActivation.status).toBe(400);
+
+    await request(app.getHttpServer()).post(`/api/live/sessions/${code}/activate`).send({ teacherId: 'u-teacher-1' });
+
+    const firstAnswer = await request(app.getHttpServer())
+      .post(`/api/live/sessions/${code}/answer`)
+      .send({ participantId, answer: 'Fibrilação atrial' });
+    expect(firstAnswer.status).toBe(201);
+    expect(firstAnswer.body.participants.find((p: { id: string }) => p.id === participantId).score).toBe(100);
+
+    const repeatedAnswer = await request(app.getHttpServer())
+      .post(`/api/live/sessions/${code}/answer`)
+      .send({ participantId, answer: 'Fibrilação atrial' });
+    expect(repeatedAnswer.status).toBe(409);
+
+    const sessions = await request(app.getHttpServer()).get('/api/live/sessions');
+    const current = sessions.body.find((s: { code: string }) => s.code === code);
+    expect(current.participants.find((p: { id: string }) => p.id === participantId).score).toBe(100);
+  });
 });
