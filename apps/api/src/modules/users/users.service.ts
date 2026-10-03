@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { db } from '../../data/in-memory.db';
+import { UsersRepository } from '../../data/repositories/repositories';
 
 @Injectable()
 export class UsersService {
+  constructor(private readonly repository: UsersRepository) {}
   list() {
-    return db.listUsers();
+    return this.repository.listUsers();
   }
 
   metrics() {
-    return db.metrics();
+    return this.repository.metrics();
   }
 }

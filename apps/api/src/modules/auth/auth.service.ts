@@ -1,12 +1,13 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { db } from '../../data/in-memory.db';
+import { UsersRepository } from '../../data/repositories/repositories';
 import { LoginDto } from './auth.dto';
 
 @Injectable()
 export class AuthService {
-  login(payload: LoginDto) {
+  constructor(private readonly repository: UsersRepository) {}
+  async login(payload: LoginDto) {
     try {
-      const user = db.login(payload.email, payload.role);
+      const user = await this.repository.login(payload.email, payload.role);
       return {
         user,
         token: `mock-token-${user.id}`,

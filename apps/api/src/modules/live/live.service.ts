@@ -1,10 +1,16 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, ServiceUnavailableException, Injectable, NotFoundException } from '@nestjs/common';
+import { runtimeConfig } from '../../data/runtime-config';
 import { db } from '../../data/in-memory.db';
 import { AnswerSessionDto, StartSessionDto } from './live.dto';
 
 @Injectable()
 export class LiveService {
+  private requireDemoLive() {
+    if (!runtimeConfig().liveEnabled) throw new ServiceUnavailableException('Aulas ao vivo indisponíveis no modo PostgreSQL até persistência e autenticação próprias.');
+  }
+
   list() {
+    if (!runtimeConfig().liveEnabled) return [];
     return db.listSessions().map((session) => ({
       ...session,
       currentQuestion: db.currentQuestion(session),
@@ -12,6 +18,7 @@ export class LiveService {
   }
 
   start(payload: StartSessionDto) {
+    this.requireDemoLive();
     const session = db.startSession(payload.teacherId, payload.title, payload.questionIds);
     return {
       ...session,
@@ -20,6 +27,7 @@ export class LiveService {
   }
 
   join(code: string, name: string) {
+    this.requireDemoLive();
     const session = db.findSessionByCode(code);
     if (!session) {
       throw new NotFoundException('Sessão não encontrada');
@@ -35,6 +43,7 @@ export class LiveService {
   }
 
   activate(code: string, teacherId: string) {
+    this.requireDemoLive();
     const session = db.findSessionByCode(code);
     if (!session) {
       throw new NotFoundException('Sessão não encontrada');
@@ -53,6 +62,7 @@ export class LiveService {
   }
 
   answer(code: string, payload: AnswerSessionDto) {
+    this.requireDemoLive();
     const existing = db.findSessionByCode(code);
     if (!existing) {
       throw new NotFoundException('Sessão não encontrada');
@@ -71,6 +81,7 @@ export class LiveService {
   }
 
   advance(code: string, teacherId: string) {
+    this.requireDemoLive();
     const session = db.findSessionByCode(code);
     if (!session) {
       throw new NotFoundException('Sessão não encontrada');

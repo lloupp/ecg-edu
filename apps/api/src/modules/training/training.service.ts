@@ -1,14 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { db } from '../../data/in-memory.db';
+import { LearningRepository } from '../../data/repositories/repositories';
 
 @Injectable()
 export class TrainingService {
+  constructor(private readonly repository: LearningRepository) {}
   next(index: number, userId?: string) {
-    return db.nextTrainingQuestion(index, userId);
+    return this.repository.nextTrainingQuestion(index, userId);
   }
 
-  answer(questionId: string, selectedAnswer: string, userId?: string) {
-    const result = db.evaluateTraining(questionId, selectedAnswer, userId);
+  async answer(questionId: string, selectedAnswer: string, userId?: string) {
+    const result = await this.repository.evaluateTraining(questionId, selectedAnswer, userId);
     if (!result) {
       throw new NotFoundException('Pergunta não encontrada');
     }
@@ -16,10 +17,10 @@ export class TrainingService {
   }
 
   progress(userId: string) {
-    return db.learningProgress(userId);
+    return this.repository.learningProgress(userId);
   }
 
   review(userId: string) {
-    return db.reviewErrors(userId);
+    return this.repository.reviewErrors(userId);
   }
 }
