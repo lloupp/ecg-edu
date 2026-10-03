@@ -32,19 +32,29 @@ async function provision() {
   const pool = new Pool({ connectionString, connectionTimeoutMillis: 5000 });
   try {
     const passwordHash = hashPassword(password);
-    const existing = await pool.query('SELECT id, role FROM users WHERE lower(email)=lower($1) LIMIT 1', [email]);
-    if (existing.rowCount) {
-      await pool.query('UPDATE users SET password_hash=$2 WHERE id=$1', [existing.rows[0].id, passwordHash]);
-      console.log(`Credential provisioned for existing ${existing.rows[0].role} account: ${email}`);
-      return;
-    }
+    await pool.query('BEGIN');
+    try {
+      const existing = await pool.query('SELECT id, role FROM users WHERE lower(email)=lower($1) LIMIT 1 FOR UPDATE', [email]);
+      if (existing.rowCount) {
+        const userId = existing.rows[0].id;
+        await pool.query('UPDATE users SET password_hash=$2 WHERE id=$1', [userId, passwordHash]);
+        await pool.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW()) WHERE user_id=$1 AND revoked_at IS NULL', [userId]);
+        await pool.query('COMMIT');
+        console.log(`Credential provisioned for existing ${existing.rows[0].role} account and active sessions revoked: ${email}`);
+        return;
+      }
 
-    await pool.query(
-      `INSERT INTO users(id,name,email,role,institution,specialty,password_hash)
-       VALUES($1,$2,$3,$4::user_role,'Comunidade ECG Edu','Aprendizagem em ECG',$5)`,
-      [randomUUID(), name, email, role, passwordHash],
-    );
-    console.log(`Account provisioned with role ${role}: ${email}`);
+      await pool.query(
+        `INSERT INTO users(id,name,email,role,institution,specialty,password_hash)
+         VALUES($1,$2,$3,$4::user_role,'Comunidade ECG Edu','Aprendizagem em ECG',$5)`,
+        [randomUUID(), name, email, role, passwordHash],
+      );
+      await pool.query('COMMIT');
+      console.log(`Account provisioned with role ${role}: ${email}`);
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
   } finally {
     await pool.end();
   }

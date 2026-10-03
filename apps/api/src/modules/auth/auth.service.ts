@@ -34,16 +34,17 @@ export class AuthService {
       throw new ConflictException('Já existe uma conta com este e-mail');
     }
     const passwordHash = await hashPassword(payload.password);
+    let user: UserProfile;
     try {
-      const user = await this.repository.createStudentAccount({
+      user = await this.repository.createStudentAccount({
         name,
         email,
         passwordHash,
       });
-      return this.issueSession(user);
     } catch {
       throw new ConflictException('Não foi possível criar a conta');
     }
+    return this.issueSession(user);
   }
 
   async login(payload: LoginDto) {
