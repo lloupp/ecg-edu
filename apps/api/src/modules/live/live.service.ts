@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, ServiceUnavailableException, Injectable, NotFoundException } from '@nestjs/common';
 import { LiveSession } from '@ecg-edu/shared';
+import { presentQuestion } from '../../data/question-presentation';
 import { runtimeConfig } from '../../data/runtime-config';
 import { db } from '../../data/in-memory.db';
 import { AnswerSessionDto, StartSessionDto } from './live.dto';
@@ -13,8 +14,7 @@ export class LiveService {
   private currentQuestion(session: LiveSession) {
     const question = db.currentQuestion(session);
     if (!question) return undefined;
-    const { correctAnswer: _correctAnswer, ...safe } = question;
-    return safe;
+    return presentQuestion(question, `live:${session.id}:${question.id}`);
   }
 
   list() {
