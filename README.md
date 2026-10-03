@@ -86,3 +86,17 @@ O CI executa essa suíte com PostgreSQL 16. Ela cria e remove apenas schemas ale
 **Ainda não está pronto para produção:** o login continua mock, RBAC/ownership não estão implementados, e a revisão clínica formal é P0. A API recusa inicializar com `NODE_ENV=production`. Aulas ao vivo ficam indisponíveis no modo PostgreSQL até receberem persistência e autenticação próprias. Consulte [a revisão deste ciclo](docs/POSTGRES-RUNTIME-2026-10-03.md).
 
 Não execute migrações diretamente em produção sem backup, staging e teste de rollback.
+
+## Demo pública no GitHub Pages
+
+A demo é um export estático independente da API e do PostgreSQL. Usa exclusivamente exemplos fictícios e ilustrações SVG, oferece os perfis de aluno/professor e salva as alterações no navegador. Não tem autenticação real nem aulas ao vivo. O botão **Reiniciar demo** restaura os exemplos.
+
+```bash
+npm run build:demo
+npx playwright install chromium
+npm run test:demo
+```
+
+O workflow `.github/workflows/pages-demo.yml` testa a demo em desktop/celular e publica `apps/web/out` a partir de `feat/pages-product-demo-20261003`, sem exigir merge na `main`. Para a primeira publicação, configure **Settings → Pages → Build and deployment → Source: GitHub Actions** e execute novamente o workflow **Public product demo** nessa branch. Se o ambiente `github-pages` restringir branches, permita a branch da demo em **Settings → Environments → github-pages**.
+
+Endereço esperado após um deploy bem-sucedido: `https://lloupp.github.io/ecg-edu/`. O workflow publica apenas o frontend estático, nunca a API, credenciais ou banco. Os ECGs e o conteúdo demonstrativo ainda aguardam revisão especialista; este endereço apresenta o produto, não um serviço clínico.

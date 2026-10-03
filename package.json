@@ -17,7 +17,9 @@
     "check": "npm run typecheck && npm test && npm run build",
     "db:migrate": "node scripts/db-migrate.cjs",
     "db:seed": "npm run build -w @ecg-edu/shared && npm run build -w @ecg-edu/api && node scripts/db-seed.cjs",
-    "test:postgres": "npm run build -w @ecg-edu/shared && npm run build -w @ecg-edu/api && node --test apps/api/test/postgres/*.test.cjs"
+    "test:postgres": "npm run build -w @ecg-edu/shared && npm run build -w @ecg-edu/api && node --test apps/api/test/postgres/*.test.cjs",
+    "build:demo": "npm run build -w @ecg-edu/shared && NEXT_PUBLIC_DEMO_MODE=true NEXT_PUBLIC_BASE_PATH=/ecg-edu npm run build -w @ecg-edu/web",
+    "test:demo": "npm run test:demo -w @ecg-edu/web"
   },
   "overrides": {
     "react": "19.2.8",

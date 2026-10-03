@@ -42,6 +42,7 @@ const emptyCaseForm = {
 };
 
 export function PlatformShell() {
+  const publicDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const [activeTab, setActiveTab] = useState<(typeof navigation)[number]['id']>('overview');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [email, setEmail] = useState('marina@ecgedu.com');
@@ -129,6 +130,13 @@ export function PlatformShell() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function enterDemo(role: UserRole) {
+    const response = await api.login({ email: role === 'teacher' ? 'marina@ecgedu.com' : 'lucas@ecgedu.com', role });
+    setUser(response.user);
+    window.localStorage.setItem('ecg-user', JSON.stringify(response.user));
+    setStatusMessage('Demo iniciada. Todas as alterações ficam apenas neste navegador.');
   }
 
   async function submitCaseForm() {
@@ -277,7 +285,7 @@ export function PlatformShell() {
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               {[
-                ['Casos curados', 'ECGs didáticos com contexto, fonte e revisão clínica'],
+                ['Casos didáticos', 'Ilustrações com contexto e referências; revisão especialista pendente'],
                 ['Interpretação estruturada', 'Frequência, ritmo, eixo, intervalos, ondas e segmentos'],
                 ['Aprendizado longitudinal', 'Feedback, revisão de erros e domínio por competência'],
               ].map(([title, text]) => (
@@ -293,13 +301,18 @@ export function PlatformShell() {
             <p className="text-sm uppercase tracking-[0.24em] text-white/60">Acesso</p>
             <h2 className="mt-4 font-display text-4xl">Entrar na plataforma</h2>
             <div className="mt-8 space-y-4">
+              {publicDemo ? <>
+                <p className="text-sm text-white/80">Demo pública com exemplos fictícios. Explore os perfis sem cadastro. Seu progresso e suas alterações ficam somente neste navegador.</p>
+                <Button className="w-full" variant="accent" onClick={() => void enterDemo('student')}>Explorar como aluno</Button>
+                <Button className="w-full" variant="outline" onClick={() => void enterDemo('teacher')}>Explorar como professor</Button>
+              </> : <>
               <div>
-                <label className="mb-2 block text-sm text-white/70">E-mail</label>
-                <Input value={email} onChange={(event) => setEmail(event.target.value)} className="border-white/20 bg-white/10 text-white placeholder:text-white/50" />
+                <label htmlFor="login-email" className="mb-2 block text-sm text-white/70">E-mail</label>
+                <Input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="border-white/20 bg-white/10 text-white placeholder:text-white/50" />
               </div>
               <div>
-                <label className="mb-2 block text-sm text-white/70">Perfil</label>
-                <select value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="h-11 w-full rounded-2xl border border-white/20 bg-white/10 px-4 text-sm text-white outline-none">
+                <label htmlFor="login-role" className="mb-2 block text-sm text-white/70">Perfil</label>
+                <select id="login-role" value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="h-11 w-full rounded-2xl border border-white/20 bg-white/10 px-4 text-sm text-white outline-none">
                   <option value="teacher" className="text-black">Professor</option>
                   <option value="student" className="text-black">Aluno</option>
                 </select>
@@ -308,6 +321,7 @@ export function PlatformShell() {
                 {loading ? 'Entrando...' : 'Acessar'}
               </Button>
               <p className="text-sm text-white/70">Sugestões: `marina@ecgedu.com` para professor, `lucas@ecgedu.com` para aluno.</p>
+              </>}
               <p className="rounded-2xl border border-white/15 bg-white/10 p-3 text-xs leading-relaxed text-white/75">Uso exclusivamente educacional. O ECG Edu não fornece diagnóstico, prescrição ou decisão clínica e não substitui avaliação profissional.</p>
             </div>
           </section>
@@ -363,7 +377,8 @@ export function PlatformShell() {
 
         {statusMessage ? <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-panel">{statusMessage}</p> : null}
         <p className="mt-4 rounded-2xl border border-border bg-muted px-4 py-3 text-xs leading-relaxed text-foreground/70">Conteúdo para treinamento educacional. Não utilize a plataforma para diagnóstico, prescrição ou tomada de decisão assistencial.</p>
-        <p className="mt-2 text-sm text-foreground/70">Ambiente de demonstração: o acesso por e-mail ainda não verifica identidade.{capabilities?.storage === 'postgresql' ? ' Seu histórico será preservado. Aulas ao vivo indisponíveis nesta etapa.' : ' Seu histórico é temporário neste modo.'}</p>
+        <p className="mt-2 text-sm text-foreground/70">{publicDemo ? 'Demo pública com exemplos fictícios. Progresso e alterações salvos somente neste navegador. Aulas ao vivo não estão disponíveis.' : `Ambiente de demonstração: o acesso por e-mail ainda não verifica identidade.${capabilities?.storage === 'postgresql' ? ' Seu histórico será preservado. Aulas ao vivo indisponíveis nesta etapa.' : ' Seu histórico é temporário neste modo.'}`}</p>
+        {publicDemo && <Button variant="outline" className="mt-2" onClick={() => void api.resetDemo().then(() => window.location.reload())}>Reiniciar demo</Button>}
 
         <section className="mt-6 space-y-6">
           {activeTab === 'overview' && (
@@ -572,12 +587,12 @@ export function PlatformShell() {
           {activeTab === 'training' && training && (
             <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
               <Card className="overflow-hidden p-0">
-                <div className="relative min-h-[320px] bg-muted">
-                  <Image src={training.caseData.ecgImageUrl} alt={training.caseData.title} fill className="object-contain p-2" unoptimized />
+                <div className="bg-muted p-2">
+                  <Image src={training.caseData.ecgImageUrl} alt="Ilustração didática de ECG" width={1200} height={630} className="h-auto w-full object-contain" unoptimized />
                 </div>
                 <div className="p-6 md:p-8">
                   <Badge>{training.caseData.level}</Badge>
-                  <h2 className="mt-3 font-display text-3xl text-secondary">{training.caseData.title}</h2>
+                  <h2 className="mt-3 font-display text-3xl text-secondary">{trainingFeedback ? training.caseData.title : 'Interprete o ECG'}</h2>
                   <p className="mt-4 text-sm text-foreground/72">{training.caseData.clinicalDescription}</p>
                 </div>
               </Card>
