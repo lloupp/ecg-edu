@@ -19,5 +19,8 @@
   "overrides": {
     "react": "19.0.8",
     "react-dom": "19.0.8"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
