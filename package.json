@@ -18,7 +18,13 @@
   },
   "overrides": {
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "postcss": "8.5.28",
+    "sharp": "0.35.4",
+    "body-parser": "2.3.0",
+    "qs": "6.16.0",
+    "nanoid": "3.3.19",
+    "multer": "2.4.0"
   },
   "engines": {
     "node": ">=22"
