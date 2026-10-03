@@ -243,7 +243,7 @@ export class InMemoryDatabase {
     const latest = new Map<string, TrainingAttempt>();
     for (const attempt of this.trainingAttempts.filter((item) => item.userId === userId)) {
       const current = latest.get(attempt.questionId);
-      if (!current || current.answeredAt < attempt.answeredAt) {
+      if (!current || current.answeredAt <= attempt.answeredAt) {
         latest.set(attempt.questionId, attempt);
       }
     }
