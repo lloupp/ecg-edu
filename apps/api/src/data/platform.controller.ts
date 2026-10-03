@@ -6,6 +6,11 @@ export class PlatformController {
   @Get('capabilities')
   capabilities() {
     const { databaseUrl, liveEnabled } = runtimeConfig();
-    return { storage: databaseUrl ? 'postgresql' : 'memory', liveEnabled, authentication: 'demonstration' };
+    return {
+      storage: databaseUrl ? 'postgresql' : 'memory',
+      liveEnabled,
+      authentication: 'password-session',
+      liveAuthorization: liveEnabled ? 'demonstration-only' : 'disabled',
+    };
   }
 }

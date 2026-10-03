@@ -1,8 +1,19 @@
-import { ClinicalCase, DashboardMetrics, LearningProgress, LearningReviewItem, LiveQuestion, TrainingAttempt, UserProfile, UserRole } from '@ecg-edu/shared';
+import { ClinicalCase, DashboardMetrics, LearningProgress, LearningReviewItem, LiveQuestion, TrainingAttempt, UserProfile } from '@ecg-edu/shared';
+
+export interface AuthUserRecord {
+  user: UserProfile;
+  passwordHash: string | null;
+}
+
+export abstract class AuthRepository {
+  abstract findAuthUserByEmail(email: string): Promise<AuthUserRecord | undefined>;
+  abstract createStudentAccount(input: { name: string; email: string; passwordHash: string }): Promise<UserProfile>;
+  abstract createAuthSession(input: { userId: string; tokenHash: string; expiresAt: string }): Promise<void>;
+  abstract resolveAuthSession(tokenHash: string): Promise<UserProfile | undefined>;
+  abstract revokeAuthSession(tokenHash: string): Promise<void>;
+}
 
 export abstract class UsersRepository {
-  // Demonstration identity only. This contract must be replaced by authenticated identity before production.
-  abstract login(email: string, role: UserRole): Promise<UserProfile>;
   abstract listUsers(): Promise<UserProfile[]>;
   abstract metrics(): Promise<DashboardMetrics>;
 }

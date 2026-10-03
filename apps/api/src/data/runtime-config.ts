@@ -1,7 +1,7 @@
 export function runtimeConfig(env: NodeJS.ProcessEnv = process.env) {
-  // Fail closed: durable data does not make the existing mock identity safe.
+  // Fail closed until the separate clinical-governance and production-hardening gates are complete.
   if (env.NODE_ENV === 'production') {
-    throw new Error('Production API blocked: real authentication, authorization and clinical review are not implemented.');
+    throw new Error('Production API blocked: formal clinical review and remaining production hardening are not complete.');
   }
   const databaseUrl = env.DATABASE_URL?.trim();
   if (databaseUrl && !/^postgres(ql)?:\/\//.test(databaseUrl)) {

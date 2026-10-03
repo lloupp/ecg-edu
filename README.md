@@ -25,6 +25,9 @@ Plataforma educacional para treinamento estruturado em interpretação de ECG.
 - revisão de erros;
 - repetição espaçada inicial;
 - domínio por competência;
+- autenticação por senha com sessões expiráveis e revogáveis;
+- RBAC e ownership no CRUD de casos;
+- treino sem exposição de gabarito antes da resposta;
 - sessões ao vivo no modo de demonstração em memória.
 
 Os ECGs SVG incluídos no repositório são **ilustrações didáticas**, não traçados clínicos de pacientes.
@@ -59,6 +62,20 @@ npm run build
 npm run check
 ```
 
+## Autenticação
+
+O registro público cria somente contas de aluno. Papéis docentes não são escolhidos pelo cliente. Contas docentes existentes ou novas devem ser provisionadas por um operador autorizado:
+
+```bash
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ecg_edu
+export AUTH_PROVISION_EMAIL=docente@example.org
+export AUTH_PROVISION_PASSWORD='uma-senha-forte-com-12-ou-mais-caracteres'
+export AUTH_PROVISION_ROLE=teacher
+npm run auth:provision
+```
+
+A API usa tokens opacos aleatórios; apenas o hash do token é salvo em `auth_sessions`. As sessões expiram e podem ser revogadas por logout. O frontend mantém o token em `sessionStorage` durante esta fase; antes de exposição pública, a topologia de deploy deve ser revisada para cookies HttpOnly/SameSite ou mecanismo equivalente, além de rate limiting e auditoria de autenticação.
+
 ## PostgreSQL
 
 A API seleciona repositories PostgreSQL quando `DATABASE_URL` está configurada. Sem essa variável, mantém o modo demonstrativo em memória. Falha de conexão ou schema incompleto interrompe a inicialização; nunca há fallback silencioso para memória.
@@ -83,6 +100,6 @@ PG_TEST_URL=postgresql://postgres:postgres@localhost:5432/ecg_edu_test npm run t
 
 O CI executa essa suíte com PostgreSQL 16. Ela cria e remove apenas schemas aleatórios exclusivos do teste. Nunca aponte `PG_TEST_URL` para um banco de produção.
 
-**Ainda não está pronto para produção:** o login continua mock, RBAC/ownership não estão implementados, e a revisão clínica formal é P0. A API recusa inicializar com `NODE_ENV=production`. Aulas ao vivo ficam indisponíveis no modo PostgreSQL até receberem persistência e autenticação próprias. Consulte [a revisão deste ciclo](docs/POSTGRES-RUNTIME-2026-10-03.md).
+**Ainda não está pronto para produção:** autenticação por senha, sessões revogáveis e RBAC/ownership já existem para os fluxos persistentes, mas revisão clínica formal, rate limiting, auditoria de autenticação, política institucional/LGPD e hardening de deploy continuam P0. A API ainda recusa inicializar com `NODE_ENV=production`. Aulas ao vivo seguem demonstrativas em memória e ficam indisponíveis no modo PostgreSQL até receberem persistência e autorização próprias. Consulte [a revisão de persistência](docs/POSTGRES-RUNTIME-2026-10-03.md) e [a revisão de autenticação](docs/AUTH-RBAC-2026-10-03.md).
 
 Não execute migrações diretamente em produção sem backup, staging e teste de rollback.

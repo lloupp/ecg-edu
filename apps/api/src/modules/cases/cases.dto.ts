@@ -51,9 +51,6 @@ export class UpsertCaseDto {
   @IsString({ each: true })
   tags!: string[];
 
-  @IsString()
-  createdBy!: string;
-
   @IsIn(['published', 'pending_review'])
   status!: 'published' | 'pending_review';
 
@@ -90,13 +87,6 @@ export class UpsertCaseDto {
   @Type(() => ClinicalReferenceDto)
   references?: ClinicalReferenceDto[];
 
-  @IsOptional()
-  @IsString()
-  reviewedBy?: string;
-
-  @IsOptional()
-  @IsString()
-  lastReviewedAt?: string;
 }
 
 export class UpdateCaseDto {
@@ -128,10 +118,6 @@ export class UpdateCaseDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
-
-  @IsOptional()
-  @IsString()
-  createdBy?: string;
 
   @IsOptional()
   @IsIn(['published', 'pending_review'])
@@ -170,11 +156,4 @@ export class UpdateCaseDto {
   @Type(() => ClinicalReferenceDto)
   references?: ClinicalReferenceDto[];
 
-  @IsOptional()
-  @IsString()
-  reviewedBy?: string;
-
-  @IsOptional()
-  @IsString()
-  lastReviewedAt?: string;
 }
