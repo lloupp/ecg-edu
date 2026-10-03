@@ -71,6 +71,10 @@ describe('InMemoryDatabase', () => {
 
 
   describe('clinical content governance', () => {
+    it('revoga publicação quando referências são removidas sem informar status', () => {
+      const updated = db.updateCase('case-af', { references: [] });
+      expect(updated?.status).toBe('pending_review');
+    });
     it('mantém caso sem referência em revisão mesmo se publicação for solicitada', () => {
       const created = db.createCase({
         title: 'Caso sem fonte',

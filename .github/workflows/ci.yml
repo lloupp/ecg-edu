@@ -16,6 +16,20 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ecg_edu_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,7 +50,13 @@ jobs:
         run: npm run typecheck
 
       - name: Unit and e2e tests
-        run: npm test -- --runInBand
+        run: npm run test -w @ecg-edu/api -- --runInBand
+
+      - name: PostgreSQL repository and runtime integration
+        run: npm run test:postgres
+        env:
+          PG_TEST_URL: postgresql://postgres:test-only-password@localhost:5432/ecg_edu_test
+          NODE_ENV: test
 
       - name: Build
         run: npm run build

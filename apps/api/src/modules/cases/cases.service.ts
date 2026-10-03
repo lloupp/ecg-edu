@@ -1,27 +1,28 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { db } from '../../data/in-memory.db';
+import { CasesRepository } from '../../data/repositories/repositories';
 import { UpdateCaseDto, UpsertCaseDto } from './cases.dto';
 
 @Injectable()
 export class CasesService {
+  constructor(private readonly repository: CasesRepository) {}
   list() {
-    return db.listCases();
+    return this.repository.listCases();
   }
 
   create(payload: UpsertCaseDto) {
-    return db.createCase(payload);
+    return this.repository.createCase(payload);
   }
 
-  update(id: string, payload: UpdateCaseDto) {
-    const updated = db.updateCase(id, payload);
+  async update(id: string, payload: UpdateCaseDto) {
+    const updated = await this.repository.updateCase(id, payload);
     if (!updated) {
       throw new NotFoundException('Caso não encontrado');
     }
     return updated;
   }
 
-  remove(id: string) {
-    const removed = db.deleteCase(id);
+  async remove(id: string) {
+    const removed = await this.repository.deleteCase(id);
     if (!removed) {
       throw new NotFoundException('Caso não encontrado');
     }

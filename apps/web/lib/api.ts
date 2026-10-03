@@ -33,6 +33,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  capabilities: () => request<{ storage: 'postgresql' | 'memory'; liveEnabled: boolean; authentication: 'demonstration' }>('/platform/capabilities'),
   login: (payload: LoginPayload) => request<{ user: UserProfile; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   metrics: () => request<DashboardMetrics>('/dashboard/metrics'),
   users: () => request<UserProfile[]>('/users'),

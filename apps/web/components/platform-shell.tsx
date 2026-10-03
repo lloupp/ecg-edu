@@ -65,6 +65,7 @@ export function PlatformShell() {
   const [selectedSessionCode, setSelectedSessionCode] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [capabilities, setCapabilities] = useState<Awaited<ReturnType<typeof api.capabilities>> | null>(null);
 
   useEffect(() => {
     const storedUser = window.localStorage.getItem('ecg-user');
@@ -76,19 +77,20 @@ export function PlatformShell() {
 
   useEffect(() => {
     if (user) {
-      void refreshAll();
-      void loadLearning(user.id);
+      void refreshAll().catch((error) => setStatusMessage(error instanceof Error ? error.message : 'Falha ao carregar dados.'));
+      void loadLearning(user.id).catch((error) => setStatusMessage(error instanceof Error ? error.message : 'Falha ao carregar progresso.'));
     }
   }, [user]);
 
   useEffect(() => {
     if (user) {
-      void loadTraining(trainingIndex);
+      void loadTraining(trainingIndex).catch((error) => setStatusMessage(error instanceof Error ? error.message : 'Falha ao carregar treino.'));
     }
   }, [user, trainingIndex]);
 
   async function refreshAll() {
-    const [metricsData, casesData, usersData, sessionsData] = await Promise.all([api.metrics(), api.cases(), api.users(), api.sessions()]);
+    const [metricsData, casesData, usersData, sessionsData, capabilityData] = await Promise.all([api.metrics(), api.cases(), api.users(), api.sessions(), api.capabilities()]);
+    setCapabilities(capabilityData);
     setMetrics(metricsData);
     setCases(casesData);
     setUsers(usersData);
@@ -332,7 +334,7 @@ export function PlatformShell() {
                 Banco estruturado de casos, sessões síncronas com pontuação e trilha individual para consolidar padrões eletrocardiográficos de alto valor clínico.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                {navigation.map((item) => (
+                {navigation.filter((item) => item.id !== 'live' || capabilities?.liveEnabled !== false).map((item) => (
                   <Button key={item.id} variant={activeTab === item.id ? 'accent' : 'outline'} onClick={() => setActiveTab(item.id)}>
                     {item.label}
                   </Button>
@@ -361,6 +363,7 @@ export function PlatformShell() {
 
         {statusMessage ? <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-panel">{statusMessage}</p> : null}
         <p className="mt-4 rounded-2xl border border-border bg-muted px-4 py-3 text-xs leading-relaxed text-foreground/70">Conteúdo para treinamento educacional. Não utilize a plataforma para diagnóstico, prescrição ou tomada de decisão assistencial.</p>
+        <p className="mt-2 text-sm text-foreground/70">Ambiente de demonstração: o acesso por e-mail ainda não verifica identidade.{capabilities?.storage === 'postgresql' ? ' Seu histórico será preservado. Aulas ao vivo indisponíveis nesta etapa.' : ' Seu histórico é temporário neste modo.'}</p>
 
         <section className="mt-6 space-y-6">
           {activeTab === 'overview' && (
@@ -475,7 +478,7 @@ export function PlatformShell() {
             </div>
           )}
 
-          {activeTab === 'live' && (
+          {activeTab === 'live' && capabilities?.liveEnabled !== false && (
             <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
               <Card className="p-6 md:p-8">
                 <p className="text-sm uppercase tracking-[0.24em] text-foreground/50">Modo aula ao vivo</p>
