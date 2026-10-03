@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
-import { ClinicalCase, LiveQuestion, TrainingAttempt, UserProfile, UserRole } from '@ecg-edu/shared';
+import { ClinicalCase, LiveQuestion, TrainingAttempt, UserProfile } from '@ecg-edu/shared';
 import { LearningEngine } from '../learning-engine';
-import { CasesRepository, LearningRepository, UsersRepository } from './repositories';
+import { AuthRepository, CasesRepository, LearningRepository, UsersRepository } from './repositories';
 
 const caseColumns = {
   title: 'title', ecgImageUrl: 'ecg_image_url', clinicalDescription: 'clinical_description',
@@ -29,7 +29,7 @@ function storedValue(key: string, value: unknown) {
   return key === 'references' || key === 'interpretation' ? JSON.stringify(value ?? (key === 'references' ? [] : null)) : value ?? null;
 }
 
-export class PostgresRepository implements CasesRepository, LearningRepository, UsersRepository, OnModuleInit, OnModuleDestroy {
+export class PostgresRepository implements AuthRepository, CasesRepository, LearningRepository, UsersRepository, OnModuleInit, OnModuleDestroy {
   readonly pool: Pool;
   constructor(connectionString: string) {
     this.pool = new Pool({ connectionString, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000,
@@ -39,6 +39,8 @@ export class PostgresRepository implements CasesRepository, LearningRepository, 
 
   async onModuleInit() {
     // Startup never creates schema, runs migrations, seeds data or falls back to memory.
+    await this.pool.query('SELECT password_hash FROM user_credentials LIMIT 0');
+    await this.pool.query('SELECT token_hash, expires_at FROM auth_sessions LIMIT 0');
     await this.pool.query('SELECT archived_at FROM clinical_cases LIMIT 0');
     await this.pool.query('SELECT explanation_snapshot FROM training_attempts LIMIT 0');
     await this.pool.query('SELECT attempt_order FROM training_attempts LIMIT 0');
@@ -58,16 +60,35 @@ export class PostgresRepository implements CasesRepository, LearningRepository, 
     } finally { client.release(); }
   }
 
-  async login(email: string, role: UserRole): Promise<UserProfile> {
-    const normalized = email.trim().toLowerCase();
-    // Demonstration only; production startup is blocked independently of DATABASE_URL.
-    const name = normalized.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-    const { rows } = await this.pool.query<UserProfile>(`INSERT INTO users(id, name, email, role, institution, specialty)
-      VALUES ($1,$2,$3,$4,'Comunidade ECG Edu','Aprendizagem educacional')
-      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING ${userSelect}`, [randomUUID(), name, normalized, role]);
-    if (rows[0].role !== role) throw new BadRequestException('E-mail vinculado a outro perfil');
+  async createAccount(user: UserProfile, passwordHash: string): Promise<UserProfile> {
+    try {
+      return await this.transaction(async (client) => {
+        const { rows } = await client.query<UserProfile>(`INSERT INTO users(id,name,email,role,institution,specialty)
+          VALUES($1,$2,$3,$4,$5,$6) RETURNING ${userSelect}`, [user.id,user.name,user.email,user.role,user.institution,user.specialty]);
+        await client.query('INSERT INTO user_credentials(user_id,password_hash) VALUES($1,$2)', [user.id,passwordHash]);
+        return rows[0];
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') throw new ConflictException('E-mail indisponível para cadastro');
+      throw error;
+    }
+  }
+  async findCredential(email: string) {
+    const { rows } = await this.pool.query<UserProfile & { passwordHash: string }>(`SELECT u.id,u.name,u.email,u.role,u.institution,u.specialty,c.password_hash AS "passwordHash"
+      FROM users u JOIN user_credentials c ON c.user_id=u.id WHERE lower(u.email)=$1`, [email]);
+    if (!rows[0]) return undefined;
+    const { passwordHash, ...user } = rows[0]; return { user, passwordHash };
+  }
+  async createSession(tokenHash: string, userId: string, expiresAt: Date) {
+    await this.pool.query('DELETE FROM auth_sessions WHERE expires_at <= NOW()');
+    await this.pool.query('INSERT INTO auth_sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)', [tokenHash,userId,expiresAt]);
+  }
+  async sessionUser(tokenHash: string) {
+    const { rows } = await this.pool.query<UserProfile>(`SELECT u.id,u.name,u.email,u.role,u.institution,u.specialty
+      FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()`, [tokenHash]);
     return rows[0];
   }
+  async revokeSession(tokenHash: string) { await this.pool.query('DELETE FROM auth_sessions WHERE token_hash=$1', [tokenHash]); }
   async listUsers() { return (await this.pool.query<UserProfile>(`SELECT ${userSelect} FROM users ORDER BY name, id`)).rows; }
   async metrics() {
     const { rows } = await this.pool.query<{ total: string; published: string; pending: string }>(`SELECT COUNT(*) AS total,

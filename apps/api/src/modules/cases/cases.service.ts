@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CasesRepository } from '../../data/repositories/repositories';
 import { UpdateCaseDto, UpsertCaseDto } from './cases.dto';
 
@@ -9,11 +9,12 @@ export class CasesService {
     return this.repository.listCases();
   }
 
-  create(payload: UpsertCaseDto) {
+  create(payload: UpsertCaseDto & { createdBy: string }) {
     return this.repository.createCase(payload);
   }
 
-  async update(id: string, payload: UpdateCaseDto) {
+  async update(id: string, payload: UpdateCaseDto, ownerId: string) {
+    await this.requireOwner(id, ownerId);
     const updated = await this.repository.updateCase(id, payload);
     if (!updated) {
       throw new NotFoundException('Caso não encontrado');
@@ -21,7 +22,13 @@ export class CasesService {
     return updated;
   }
 
-  async remove(id: string) {
+  private async requireOwner(id: string, ownerId: string) {
+    const item = (await this.repository.listCases()).find((c) => c.id === id);
+    if (!item) throw new NotFoundException('Caso não encontrado');
+    if (item.createdBy !== ownerId) throw new ForbiddenException('Apenas o autor pode alterar ou excluir este caso');
+  }
+  async remove(id: string, ownerId: string) {
+    await this.requireOwner(id, ownerId);
     const removed = await this.repository.deleteCase(id);
     if (!removed) {
       throw new NotFoundException('Caso não encontrado');

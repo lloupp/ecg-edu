@@ -60,3 +60,10 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      - name: Authenticated browser flow
+        run: npm run test:auth:web
