@@ -24,8 +24,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Refresh package-lock
-        run: npm install --package-lock-only
+      - name: Rebuild package-lock
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only
 
       - name: Commit lockfile
         run: |
