@@ -140,7 +140,7 @@ export function PlatformShell() {
       ecgImageKind: 'schematic' as const,
       learningObjectives: learningObjectives.split(',').map((item) => item.trim()).filter(Boolean),
       differentialDiagnoses: differentialDiagnoses.split(',').map((item) => item.trim()).filter(Boolean),
-      references: referenceTitle && referenceUrl ? [{ title: referenceTitle, organization: 'Fonte informada pelo autor', year: new Date().getFullYear(), url: referenceUrl }] : [],
+      references: referenceTitle && referenceUrl ? [{ title: referenceTitle, organization: 'Fonte informada pelo autor', url: referenceUrl }] : [],
     };
 
     const saved = editingId
@@ -622,7 +622,7 @@ export function PlatformShell() {
                       <div className="mt-4 text-sm">
                         <strong>Referências:</strong>
                         <ul className="mt-2 list-disc space-y-1 pl-5">
-                          {training.caseData.references.map((reference) => <li key={reference.url}><a className="underline" href={reference.url} target="_blank" rel="noreferrer">{reference.title} ({reference.year})</a></li>)}
+                          {training.caseData.references.map((reference) => <li key={reference.url}><a className="underline" href={reference.url} target="_blank" rel="noreferrer">{reference.title}{reference.year ? ` (${reference.year})` : ''}</a></li>)}
                         </ul>
                       </div>
                     ) : null}
