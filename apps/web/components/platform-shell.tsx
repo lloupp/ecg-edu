@@ -93,19 +93,20 @@ export function PlatformShell() {
   }, [user, trainingIndex]);
 
   async function refreshAll() {
-    const [casesData, capabilityData] = await Promise.all([api.cases(), api.capabilities()]);
+    const capabilityData = await api.capabilities();
     setCapabilities(capabilityData);
-    setCases(casesData);
 
     const sessionsData = capabilityData.liveEnabled ? await api.sessions() : [];
     setSessions(sessionsData);
     if (!selectedSessionCode && sessionsData[0]) setSelectedSessionCode(sessionsData[0].code);
 
     if (user?.role === 'teacher') {
-      const [metricsData, usersData] = await Promise.all([api.metrics(), api.users()]);
+      const [casesData, metricsData, usersData] = await Promise.all([api.cases(), api.metrics(), api.users()]);
+      setCases(casesData);
       setMetrics(metricsData);
       setUsers(usersData);
     } else {
+      setCases([]);
       setMetrics(null);
       setUsers([]);
     }
