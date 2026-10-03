@@ -1,4 +1,5 @@
-import { IsArray, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsIn, IsObject, IsOptional, IsString } from 'class-validator';
+import type { ClinicalReference, CompetencyCode, EcgInterpretation } from '@ecg-edu/shared';
 
 export class UpsertCaseDto {
   @IsString()
@@ -27,6 +28,42 @@ export class UpsertCaseDto {
 
   @IsIn(['published', 'pending_review'])
   status!: 'published' | 'pending_review';
+
+  @IsOptional()
+  @IsIn(['schematic', 'deidentified_clinical'])
+  ecgImageKind?: 'schematic' | 'deidentified_clinical';
+
+  @IsOptional()
+  @IsString()
+  imageSource?: string;
+
+  @IsOptional()
+  @IsArray()
+  learningObjectives?: string[];
+
+  @IsOptional()
+  @IsArray()
+  competencies?: CompetencyCode[];
+
+  @IsOptional()
+  @IsArray()
+  differentialDiagnoses?: string[];
+
+  @IsOptional()
+  @IsObject()
+  interpretation?: EcgInterpretation;
+
+  @IsOptional()
+  @IsArray()
+  references?: ClinicalReference[];
+
+  @IsOptional()
+  @IsString()
+  reviewedBy?: string;
+
+  @IsOptional()
+  @IsString()
+  lastReviewedAt?: string;
 }
 
 export class UpdateCaseDto {
@@ -65,4 +102,40 @@ export class UpdateCaseDto {
   @IsOptional()
   @IsIn(['published', 'pending_review'])
   status?: 'published' | 'pending_review';
+
+  @IsOptional()
+  @IsIn(['schematic', 'deidentified_clinical'])
+  ecgImageKind?: 'schematic' | 'deidentified_clinical';
+
+  @IsOptional()
+  @IsString()
+  imageSource?: string;
+
+  @IsOptional()
+  @IsArray()
+  learningObjectives?: string[];
+
+  @IsOptional()
+  @IsArray()
+  competencies?: CompetencyCode[];
+
+  @IsOptional()
+  @IsArray()
+  differentialDiagnoses?: string[];
+
+  @IsOptional()
+  @IsObject()
+  interpretation?: EcgInterpretation;
+
+  @IsOptional()
+  @IsArray()
+  references?: ClinicalReference[];
+
+  @IsOptional()
+  @IsString()
+  reviewedBy?: string;
+
+  @IsOptional()
+  @IsString()
+  lastReviewedAt?: string;
 }
