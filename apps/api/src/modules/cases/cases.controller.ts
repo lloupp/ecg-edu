@@ -11,6 +11,7 @@ export class CasesController {
   constructor(private readonly casesService: CasesService) {}
 
   @Get()
+  @Roles('teacher')
   list() { return this.casesService.list(); }
 
   @Post()
