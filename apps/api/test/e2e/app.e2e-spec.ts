@@ -41,6 +41,43 @@ describe('ECG Edu API (e2e)', () => {
     expect(res.body.caseData).toBeDefined();
   });
 
+  it('registra treino do aluno e expõe progresso longitudinal', async () => {
+    const answer = await request(app.getHttpServer())
+      .post('/api/training/answer')
+      .send({ questionId: 'q-af', selectedAnswer: 'resposta incorreta', userId: 'u-student-1' });
+    expect(answer.status).toBe(201);
+    expect(answer.body.isCorrect).toBe(false);
+    expect(answer.body.nextReviewAt).toBeDefined();
+
+    const progress = await request(app.getHttpServer()).get('/api/training/progress?userId=u-student-1');
+    expect(progress.status).toBe(200);
+    expect(progress.body.totalAttempts).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(progress.body.competencies)).toBe(true);
+
+    const review = await request(app.getHttpServer()).get('/api/training/review?userId=u-student-1');
+    expect(review.status).toBe(200);
+    expect(Array.isArray(review.body)).toBe(true);
+  });
+
+  it('não publica caso clínico sem referência verificável', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/cases')
+      .send({
+        title: 'Caso sem fonte',
+        ecgImageUrl: '/ecgs/ecg-af.svg',
+        clinicalDescription: 'Descrição didática',
+        diagnosis: 'Diagnóstico didático',
+        explanation: 'Explicação',
+        level: 'basic',
+        tags: ['teste'],
+        createdBy: 'u-teacher-1',
+        status: 'published',
+        references: [],
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('pending_review');
+  });
+
   it('rejeita (403) ativar sessão de professor que não é o dono', async () => {
     const start = await request(app.getHttpServer())
       .post('/api/live/sessions')
