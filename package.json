@@ -11,6 +11,9 @@
     "dev:api": "npm run start:dev -w @ecg-edu/api",
     "build": "npm run build -w @ecg-edu/shared && npm run build -w @ecg-edu/api && npm run build -w @ecg-edu/web",
     "lint": "npm run lint -w @ecg-edu/shared && npm run lint -w @ecg-edu/api && npm run lint -w @ecg-edu/web",
-    "typecheck": "npm run typecheck -w @ecg-edu/shared && npm run typecheck -w @ecg-edu/api && npm run typecheck -w @ecg-edu/web"
+    "typecheck": "npm run typecheck -w @ecg-edu/shared && npm run typecheck -w @ecg-edu/api && npm run typecheck -w @ecg-edu/web",
+    "test": "npm run test -w @ecg-edu/api",
+    "test:e2e": "npm run test:e2e -w @ecg-edu/api",
+    "check": "npm run typecheck && npm test && npm run build"
   }
 }
