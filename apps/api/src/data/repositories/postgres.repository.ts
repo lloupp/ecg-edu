@@ -41,6 +41,7 @@ export class PostgresRepository implements CasesRepository, LearningRepository, 
     // Startup never creates schema, runs migrations, seeds data or falls back to memory.
     await this.pool.query('SELECT archived_at FROM clinical_cases LIMIT 0');
     await this.pool.query('SELECT explanation_snapshot FROM training_attempts LIMIT 0');
+    await this.pool.query('SELECT attempt_order FROM training_attempts LIMIT 0');
   }
   async onModuleDestroy() { await this.pool.end(); }
 
@@ -127,7 +128,7 @@ export class PostgresRepository implements CasesRepository, LearningRepository, 
     const cases = (await client.query<ClinicalCase>(`SELECT ${caseSelect} FROM clinical_cases c ${publishedOnly ? "WHERE c.archived_at IS NULL AND c.status='published'" : ''} ORDER BY c.id`)).rows;
     const questions = (await client.query<LiveQuestion>(`SELECT ${questionSelect} FROM live_questions ORDER BY id`)).rows.filter((q) => cases.some((c) => c.id === q.caseId));
     const attempts = userId ? (await client.query<TrainingAttempt & { answeredAt: Date; nextReviewAt: Date }>(
-      `SELECT ${attemptSelect} FROM training_attempts WHERE user_id=$1 ORDER BY created_at,id`, [uuid(userId)])).rows.map((a) => ({ ...a,
+      `SELECT ${attemptSelect} FROM training_attempts WHERE user_id=$1 ORDER BY created_at,attempt_order`, [uuid(userId)])).rows.map((a) => ({ ...a,
       answeredAt: new Date(a.answeredAt).toISOString(), nextReviewAt: new Date(a.nextReviewAt).toISOString() })) : [];
     return new LearningEngine(cases, questions, attempts, false);
   }
@@ -165,7 +166,7 @@ export class PostgresRepository implements CasesRepository, LearningRepository, 
       // Keep historical scores, but do not schedule unavailable/archived questions for review.
       const { rows } = await client.query<{ count: string }>(`WITH latest AS (
         SELECT DISTINCT ON (question_id) question_id, next_review_at FROM training_attempts
-        WHERE user_id=$1 ORDER BY question_id, created_at DESC, id DESC
+        WHERE user_id=$1 ORDER BY question_id, created_at DESC, attempt_order DESC
       ) SELECT COUNT(*) FROM latest a JOIN live_questions q ON q.id=a.question_id
         JOIN clinical_cases c ON c.id=q.case_id
         WHERE c.archived_at IS NULL AND c.status='published' AND a.next_review_at <= NOW()`, [uuid(userId)]);

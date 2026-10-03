@@ -77,6 +77,7 @@ CREATE TABLE session_answers (
 
 CREATE TABLE training_attempts (
   id UUID PRIMARY KEY,
+  attempt_order BIGINT GENERATED ALWAYS AS IDENTITY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   question_id UUID NOT NULL REFERENCES live_questions(id) ON DELETE CASCADE,
   case_id UUID NOT NULL REFERENCES clinical_cases(id) ON DELETE CASCADE,

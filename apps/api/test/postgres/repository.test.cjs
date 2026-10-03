@@ -54,7 +54,7 @@ test('migration and development seed are repeatable and preserve existing rows',
   await seed(url);
   assert.ok((await repository.listCases()).some((c) => c.id === created.id && c.title.includes('DROP TABLE')));
   assert.equal((await repository.listUsers()).length, 3);
-  assert.equal(Number((await repository.pool.query('SELECT COUNT(*) FROM ecg_schema_migrations')).rows[0].count), 3);
+  assert.equal(Number((await repository.pool.query('SELECT COUNT(*) FROM ecg_schema_migrations')).rows[0].count), 4);
 });
 
 test('existing legacy schema and history are migrated without recreation', async () => {
@@ -108,6 +108,16 @@ test('concurrent correct answers serialize spaced repetition intervals without l
   const attempts = await Promise.all([1,2,3].map(() => repository.evaluateTraining(seedId('q-af'), 'Fibrilação atrial', student.id)));
   assert.deepEqual(attempts.map((a) => Math.round((Date.parse(a.nextReviewAt)-Date.parse(a.answeredAt))/86400000)).sort((a,b) => a-b), [1,3,7]);
   assert.equal((await repository.learningProgress(student.id)).totalAttempts, 3);
+});
+
+test('latest attempt follows insertion order when timestamps are equal', async () => {
+  const student = await repository.login('timestamp-tie@example.org', 'student');
+  const question = seedId('q-af');
+  await repository.evaluateTraining(question, 'Incorreta', student.id);
+  await repository.evaluateTraining(question, 'Fibrilação atrial', student.id);
+  await repository.pool.query("UPDATE training_attempts SET created_at='2026-10-03T00:00:00Z' WHERE user_id=$1", [student.id]);
+  assert.equal((await repository.reviewErrors(student.id)).length, 0);
+  assert.equal((await repository.learningProgress(student.id)).accuracy, 50);
 });
 
 test('failed question insert rolls back the corresponding case', async () => {

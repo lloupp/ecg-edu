@@ -31,6 +31,7 @@ Data: 2026-10-03. Branch: `feat/postgres-learning-runtime-20261003`.
 - `000_initial.sql`: baseline legado, criado somente em instalação vazia. Schema legado completo é adotado; schema parcial é rejeitado em transação.
 - `001_learning_foundation.sql`: existente e preservada, acrescenta metadados e backfill de aprendizagem.
 - `002_runtime_persistence.sql`: `clinical_cases.archived_at`, `training_attempts.explanation_snapshot`, backfill e índice de casos ativos.
+- `003_attempt_order.sql`: ordem de inserção monotônica para desempatar timestamps. Empates legados não permitem reconstruir a ordem original.
 - Nenhuma migration remove tabelas, recria o banco, apaga usuários ou apaga tentativas. `schema.sql` acompanha instalações novas.
 - A memória demonstrativa nunca foi durável. Não há exportação/migração automática de um processo de demonstração já em execução.
 
@@ -40,8 +41,8 @@ Data: 2026-10-03. Branch: `feat/postgres-learning-runtime-20261003`.
 - 27 testes unitários/e2e passam (23 existentes + 4 novos).
 - Audit de produção: zero vulnerabilidades. Audit completo: 32 alertas altos no tooling, propagados de `braces <=3.0.3`. Registry observado não oferece patch compatível; sem `audit fix --force`, sem downgrade de proteções e sem esconder o audit.
 - Suíte PostgreSQL dedicada cobre migração nova/legada/partial, seed idempotente, rollback, isolamento entre usuários na leitura de repositório, reconexão, concorrência, publicação, arquivamento, rotação e runtime Nest.
-- PostgreSQL local não inicia neste executor: apenas UID 0 está mapeado e não é possível criar usuário não root. Integração real é executada no GitHub Actions com serviço PostgreSQL 16; resultado final registrado na PR.
-- Smoke de UI a validar separadamente; CI desta etapa cobre REST e persistência. Não equivale a revisão de acessibilidade ou clínica especializada.
+- PostgreSQL local não inicia neste executor: apenas UID 0 está mapeado e não é possível criar usuário não root. Integração real no GitHub Actions com PostgreSQL 16 passou no primeiro commit (9/9 testes, CI 37124505368). Review posterior adicionou teste de desempate de timestamps; resultado final registrado na PR.
+- Smoke de UI bloqueado neste executor: `agent-browser` não inicia e downloads de Chrome/Chromium falham por certificado/arquivo incompleto. Servidores frontend/API iniciaram, porém isso não conta como verificação visual. CI desta etapa cobre REST e persistência; não equivale a revisão de acessibilidade ou clínica especializada.
 
 ## Riscos e P0 restantes
 
