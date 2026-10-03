@@ -34,7 +34,7 @@ export interface EcgInterpretation {
 export interface ClinicalReference {
   title: string;
   organization: string;
-  year: number;
+  year?: number;
   url: string;
 }
 
