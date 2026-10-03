@@ -15,6 +15,9 @@ function extractErrorMessage(body: string): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+    return (await import('./demo-api')).demoRequest<T>(path, init);
+  }
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
@@ -33,7 +36,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  capabilities: () => request<{ storage: 'postgresql' | 'memory'; liveEnabled: boolean; authentication: 'demonstration' }>('/platform/capabilities'),
+  capabilities: () => request<{ storage: 'postgresql' | 'memory' | 'browser'; liveEnabled: boolean; authentication: 'demonstration' | 'public_demo' }>('/platform/capabilities'),
+  resetDemo: () => request<{ success: boolean }>('/demo/reset', { method: 'POST' }),
   login: (payload: LoginPayload) => request<{ user: UserProfile; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   metrics: () => request<DashboardMetrics>('/dashboard/metrics'),
   users: () => request<UserProfile[]>('/users'),

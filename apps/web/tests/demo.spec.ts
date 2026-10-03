@@ -1,0 +1,55 @@
+import { test, expect } from '@playwright/test';
+
+test('student can train, view persistent progress and reset without an API', async ({ page }) => {
+  const errors: string[] = [];
+  const apiCalls: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/localhost:4000|\/api\//.test(request.url())) apiCalls.push(request.url()); });
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Explorar como aluno', exact: true }).click();
+  await expect(page.getByText('Progresso e alterações salvos somente neste navegador.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Aula ao vivo', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Treino', exact: true }).click();
+  const ecg = page.locator('img').first();
+  await expect(ecg).toBeVisible();
+  await expect.poll(() => ecg.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  const dimensions = await ecg.evaluate((image: HTMLImageElement) => ({ width: image.clientWidth, height: image.clientHeight, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight }));
+  expect(Math.abs(dimensions.width / dimensions.height - dimensions.naturalWidth / dimensions.naturalHeight)).toBeLessThan(0.05);
+  await page.getByRole('button', { name: 'Fibrilação atrial', exact: true }).click();
+  await page.getByRole('button', { name: 'Responder', exact: true }).click();
+  await expect(page.getByText('Resposta correta', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Meu progresso', exact: true }).click();
+  await expect(page.getByText('1 tentativas', { exact: false }).first()).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Meu progresso', exact: true }).click();
+  await expect(page.getByText('1 tentativas', { exact: false }).first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: 'Reiniciar demo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Explorar como aluno', exact: true })).toBeVisible();
+  expect(apiCalls).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('teacher demo and clinical library render locally', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Explorar como professor', exact: true }).click();
+  await expect(page.getByText('Perfil professor', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Banco de casos', exact: true }).click();
+  await expect(page.getByText('Fibrilação atrial com resposta ventricular rápida', { exact: true })).toBeVisible();
+  await page.getByPlaceholder('Título do caso', { exact: true }).fill('Exemplo local do professor');
+  await page.getByPlaceholder('Descrição clínica', { exact: true }).fill('Cenário fictício para apresentar o formulário.');
+  await page.getByPlaceholder('Diagnóstico correto', { exact: true }).fill('ECG normal');
+  await page.getByPlaceholder('Explicação', { exact: true }).fill('Exemplo demonstrativo.');
+  await page.getByRole('button', { name: 'Cadastrar caso', exact: true }).click();
+  await expect(page.getByText('Novo caso cadastrado.', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Banco de casos', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Exemplo local do professor', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Editar', exact: true }).first().click();
+  await page.getByPlaceholder('Título do caso', { exact: true }).fill('Exemplo local atualizado');
+  await page.getByRole('button', { name: 'Salvar alterações', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Exemplo local atualizado', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Excluir', exact: true }).first().click();
+  await expect(page.getByRole('heading', { name: 'Exemplo local atualizado', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});

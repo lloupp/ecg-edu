@@ -1,0 +1,43 @@
+name: Public product demo
+on:
+  push:
+    branches: ['feat/pages-product-demo-20261003']
+  pull_request:
+    paths: ['apps/web/**', 'scripts/serve-demo.cjs', '.github/workflows/pages-demo.yml', 'package*.json']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build:demo
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run test:demo
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/out
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/feat/pages-product-demo-20261003'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Publish static demonstration
+        uses: actions/deploy-pages@v4
+        id: deployment

@@ -5,3 +5,7 @@ coverage
 .env
 
 *.tsbuildinfo
+
+apps/web/out/
+**/test-results/
+**/playwright-report/
