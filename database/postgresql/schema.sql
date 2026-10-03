@@ -17,15 +17,25 @@ CREATE TABLE clinical_cases (
   id UUID PRIMARY KEY,
   title TEXT NOT NULL,
   ecg_image_url TEXT NOT NULL,
+  ecg_image_kind TEXT NOT NULL DEFAULT 'schematic' CHECK (ecg_image_kind IN ('schematic', 'deidentified_clinical')),
+  image_source TEXT,
   clinical_description TEXT NOT NULL,
   diagnosis TEXT NOT NULL,
   explanation TEXT NOT NULL,
   level case_level NOT NULL,
   tags TEXT[] NOT NULL DEFAULT '{}',
+  learning_objectives TEXT[] NOT NULL DEFAULT '{}',
+  competencies TEXT[] NOT NULL DEFAULT '{}',
+  differential_diagnoses TEXT[] NOT NULL DEFAULT '{}',
+  interpretation JSONB,
+  clinical_references JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_by UUID NOT NULL REFERENCES users(id),
   status case_status NOT NULL DEFAULT 'pending_review',
+  reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  last_reviewed_at DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (status <> 'published' OR jsonb_array_length(clinical_references) > 0)
 );
 
 CREATE TABLE live_questions (
@@ -68,7 +78,14 @@ CREATE TABLE training_attempts (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   question_id UUID NOT NULL REFERENCES live_questions(id) ON DELETE CASCADE,
+  case_id UUID NOT NULL REFERENCES clinical_cases(id) ON DELETE CASCADE,
   selected_answer TEXT NOT NULL,
   is_correct BOOLEAN NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  competency_codes TEXT[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  next_review_at TIMESTAMPTZ NOT NULL
 );
+
+CREATE INDEX idx_training_attempts_user_created ON training_attempts(user_id, created_at DESC);
+CREATE INDEX idx_training_attempts_user_review ON training_attempts(user_id, next_review_at);
+CREATE INDEX idx_clinical_cases_status_level ON clinical_cases(status, level);
