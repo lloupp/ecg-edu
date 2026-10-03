@@ -75,7 +75,7 @@ export async function demoRequest<T>(path: string, init?: RequestInit): Promise<
     const attempt: TrainingAttempt = { id: crypto.randomUUID(), userId: body.userId, questionId: question.id, caseId: clinicalCase.id,
       selectedAnswer: body.selectedAnswer, isCorrect, explanation: clinicalCase.explanation, competencyCodes: clinicalCase.competencies ?? ['diagnosis'],
       answeredAt: new Date().toISOString(), nextReviewAt: new Date(Date.now() + days * 86400000).toISOString() };
-    store.attempts.push(attempt); save(); result = attempt;
+    store.attempts.push(attempt); save(); result = { ...attempt, caseData: cases().find((item) => item.id === clinicalCase.id) };
   } else if (url.pathname === '/training/progress') result = progress(url.searchParams.get('userId') ?? '');
   else if (url.pathname === '/training/review') result = review(url.searchParams.get('userId') ?? '');
   else if (url.pathname === '/cases' && (!init?.method || init.method === 'GET')) result = cases();

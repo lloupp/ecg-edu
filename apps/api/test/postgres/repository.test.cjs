@@ -1,6 +1,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
+const { hashPassword } = require('../../dist/modules/auth/password');
 const { Pool } = require('pg');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
@@ -54,7 +55,7 @@ test('migration and development seed are repeatable and preserve existing rows',
   await seed(url);
   assert.ok((await repository.listCases()).some((c) => c.id === created.id && c.title.includes('DROP TABLE')));
   assert.equal((await repository.listUsers()).length, 3);
-  assert.equal(Number((await repository.pool.query('SELECT COUNT(*) FROM ecg_schema_migrations')).rows[0].count), 4);
+  assert.equal(Number((await repository.pool.query('SELECT COUNT(*) FROM ecg_schema_migrations')).rows[0].count), 5);
 });
 
 test('existing legacy schema and history are migrated without recreation', async () => {
@@ -99,19 +100,19 @@ test('attempt, feedback, progress and error review survive closing and reopening
   assert.equal(progress.competencies.find((c) => c.code === 'rhythm').attempts, 1);
   assert.equal((await repository.reviewErrors(student))[0].lastAttempt.id, attempt.id);
   assert.equal((await repository.reviewErrors(student))[0].lastAttempt.explanation, attempt.explanation);
-  const other = await repository.login('other-student@example.org', 'student');
+  const other = await repository.createAccount({ id: randomUUID(), email: 'other-student@example.org', name: 'Aluno de teste', role: 'student', institution: 'Teste', specialty: 'Teste' }, 'unused-in-repository-tests');
   assert.equal((await repository.learningProgress(other.id)).totalAttempts, 0);
 });
 
 test('concurrent correct answers serialize spaced repetition intervals without lost attempts', async () => {
-  const student = await repository.login('concurrent@example.org', 'student');
+  const student = await repository.createAccount({ id: randomUUID(), email: 'concurrent@example.org', name: 'Aluno de teste', role: 'student', institution: 'Teste', specialty: 'Teste' }, 'unused-in-repository-tests');
   const attempts = await Promise.all([1,2,3].map(() => repository.evaluateTraining(seedId('q-af'), 'Fibrilação atrial', student.id)));
   assert.deepEqual(attempts.map((a) => Math.round((Date.parse(a.nextReviewAt)-Date.parse(a.answeredAt))/86400000)).sort((a,b) => a-b), [1,3,7]);
   assert.equal((await repository.learningProgress(student.id)).totalAttempts, 3);
 });
 
 test('latest attempt follows insertion order when timestamps are equal', async () => {
-  const student = await repository.login('timestamp-tie@example.org', 'student');
+  const student = await repository.createAccount({ id: randomUUID(), email: 'timestamp-tie@example.org', name: 'Aluno de teste', role: 'student', institution: 'Teste', specialty: 'Teste' }, 'unused-in-repository-tests');
   const question = seedId('q-af');
   await repository.evaluateTraining(question, 'Incorreta', student.id);
   await repository.evaluateTraining(question, 'Fibrilação atrial', student.id);
@@ -158,17 +159,40 @@ test('Nest runtime uses PostgreSQL for login, cases, attempts and progress', asy
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
-    const login = await request(app.getHttpServer()).post('/api/auth/login').send({ email: 'runtime@example.org', role: 'student' });
+    const client = request.agent(app.getHttpServer());
+    const login = await client.post('/api/auth/register').send({ email: 'runtime@example.org', name: 'Teste runtime', password: 'Frase longa para teste runtime 2026!' });
     assert.equal(login.status, 201);
-    const answer = await request(app.getHttpServer()).post('/api/training/answer').send({ questionId: seedId('q-af'), selectedAnswer: 'Fibrilação atrial', userId: login.body.user.id });
+    const answer = await client.post('/api/training/answer').send({ questionId: seedId('q-af'), selectedAnswer: 'Fibrilação atrial', userId: login.body.user.id });
     assert.equal(answer.status, 201);
-    const progress = await request(app.getHttpServer()).get(`/api/training/progress?userId=${login.body.user.id}`);
+    const progress = await client.get(`/api/training/progress?userId=${login.body.user.id}`);
     assert.equal(progress.body.totalAttempts, 1);
     assert.equal((await repository.learningProgress(login.body.user.id)).totalAttempts, 1);
-    const live = await request(app.getHttpServer()).post('/api/live/sessions').send({ teacherId: seedId('u-teacher-1'), title: 'Aula', questionIds: [] });
+    const live = await client.post('/api/live/sessions').send({ teacherId: seedId('u-teacher-1'), title: 'Aula', questionIds: [] });
     assert.equal(live.status, 503);
   } finally {
     if (app) await app.close();
     if (previous === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = previous;
   }
+});
+
+
+test('password credentials, expiry and session revocation survive a repository restart', async () => {
+  const password = 'Frase longa de teste PostgreSQL!';
+  const user = await repository.createAccount({ id: randomUUID(), email: 'credential-pg@example.org', name: 'Aluno persistente', role: 'student', institution: 'Teste', specialty: 'Teste' }, await hashPassword(password));
+  const tokenHash = createHash('sha256').update('isolated-test-token').digest('hex');
+  await repository.createSession(tokenHash, user.id, new Date(Date.now() + 60000));
+  const reopened = new PostgresRepository(url);
+  try {
+    await reopened.onModuleInit();
+    const credential = await reopened.findCredential(user.email);
+    assert.equal(credential.user.id, user.id);
+    assert.ok(credential.passwordHash.startsWith('scrypt-v1$'));
+    assert.notEqual(credential.passwordHash, password);
+    assert.equal((await reopened.sessionUser(tokenHash)).id, user.id);
+    await assert.rejects(reopened.createAccount({ ...user, id: randomUUID(), email: user.email.toUpperCase() }, 'unused'), /E-mail indisponível/);
+    await reopened.revokeSession(tokenHash);
+    assert.equal(await repository.sessionUser(tokenHash), undefined);
+    await repository.createSession(tokenHash, user.id, new Date(Date.now() - 1000));
+    assert.equal(await reopened.sessionUser(tokenHash), undefined);
+  } finally { await reopened.onModuleDestroy(); }
 });

@@ -8,7 +8,8 @@
     "start": "next start -H 127.0.0.1 -p 3000",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test:demo": "playwright test"
+    "test:demo": "playwright test",
+    "test:auth": "playwright test --config=auth.playwright.config.ts"
   },
   "dependencies": {
     "@ecg-edu/shared": "0.0.1",

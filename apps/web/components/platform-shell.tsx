@@ -45,15 +45,17 @@ export function PlatformShell() {
   const publicDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const [activeTab, setActiveTab] = useState<(typeof navigation)[number]['id']>('overview');
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [email, setEmail] = useState('marina@ecgedu.com');
-  const [role, setRole] = useState<UserRole>('teacher');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [registerMode, setRegisterMode] = useState(false);
+  const [accountName, setAccountName] = useState('');
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [cases, setCases] = useState<ClinicalCase[]>([]);
+  const [cases, setCases] = useState<Awaited<ReturnType<typeof api.cases>>>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [sessions, setSessions] = useState<SessionView[]>([]);
   const [training, setTraining] = useState<TrainingQuestion | null>(null);
   const [trainingIndex, setTrainingIndex] = useState(0);
-  const [trainingFeedback, setTrainingFeedback] = useState<{ isCorrect: boolean; explanation: string } | null>(null);
+  const [trainingFeedback, setTrainingFeedback] = useState<Awaited<ReturnType<typeof api.answerTraining>> | null>(null);
   const [selectedTrainingAnswer, setSelectedTrainingAnswer] = useState('');
   const [learningProgress, setLearningProgress] = useState<LearningProgress | null>(null);
   const [reviewErrors, setReviewErrors] = useState<Awaited<ReturnType<typeof api.reviewErrors>>>([]);
@@ -68,13 +70,24 @@ export function PlatformShell() {
   const [loading, setLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<Awaited<ReturnType<typeof api.capabilities>> | null>(null);
 
+  function clearSession() {
+    setUser(null); setCases([]); setUsers([]); setSessions([]); setMetrics(null);
+    setTraining(null); setTrainingFeedback(null); setLearningProgress(null); setReviewErrors([]);
+    setActiveTab('overview'); setEditingId(null); setCaseForm(emptyCaseForm);
+  }
   useEffect(() => {
-    const storedUser = window.localStorage.getItem('ecg-user');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser) as UserProfile;
-      setUser(parsed);
+    if (publicDemo) {
+      try {
+        const stored = window.localStorage.getItem('ecg-user');
+        if (stored) setUser(JSON.parse(stored) as UserProfile);
+      } catch { /* Optional browser storage. */ }
+    } else {
+      void api.me().then(({ user }) => setUser(user)).catch(() => clearSession());
     }
-  }, []);
+    const expired = () => { clearSession(); setStatusMessage('Sessão encerrada. Faça login novamente.'); };
+    window.addEventListener('ecg-session-expired', expired);
+    return () => window.removeEventListener('ecg-session-expired', expired);
+  }, [publicDemo]);
 
   useEffect(() => {
     if (user) {
@@ -121,9 +134,10 @@ export function PlatformShell() {
     setLoading(true);
     setStatusMessage('');
     try {
-      const response = await api.login({ email, role });
+      const response = registerMode ? await api.register({ email, password, name: accountName }) : await api.login({ email, password });
+      setPassword('');
       setUser(response.user);
-      window.localStorage.setItem('ecg-user', JSON.stringify(response.user));
+
       setStatusMessage(`Sessão iniciada como ${response.user.name}.`);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : 'Falha ao autenticar');
@@ -133,12 +147,15 @@ export function PlatformShell() {
   }
 
   async function enterDemo(role: UserRole) {
-    const response = await api.login({ email: role === 'teacher' ? 'marina@ecgedu.com' : 'lucas@ecgedu.com', role });
+    const response = await api.enterDemo(role);
     setUser(response.user);
-    window.localStorage.setItem('ecg-user', JSON.stringify(response.user));
+    try { window.localStorage.setItem('ecg-user', JSON.stringify(response.user)); } catch { /* Optional browser storage. */ }
     setStatusMessage('Demo iniciada. Todas as alterações ficam apenas neste navegador.');
   }
 
+  async function safeAction(action: () => Promise<void>) {
+    try { await action(); } catch (error) { setStatusMessage(error instanceof Error ? error.message : 'Falha ao executar a ação.'); }
+  }
   async function submitCaseForm() {
     if (!user) {
       return;
@@ -154,8 +171,9 @@ export function PlatformShell() {
       references: referenceTitle && referenceOrganization && referenceUrl ? [{ title: referenceTitle, organization: referenceOrganization, url: referenceUrl }] : [],
     };
 
+    const { createdBy: _createdBy, ...updatePayload } = payload;
     const saved = editingId
-      ? await api.updateCase(editingId, payload)
+      ? await api.updateCase(editingId, updatePayload)
       : await api.createCase(payload);
     setStatusMessage(
       saved.status === 'pending_review' && caseForm.status === 'published'
@@ -258,7 +276,7 @@ export function PlatformShell() {
       return;
     }
     const result = await api.answerTraining(training.question.id, selectedTrainingAnswer, user?.id);
-    setTrainingFeedback({ isCorrect: result.isCorrect, explanation: result.explanation });
+    setTrainingFeedback(result);
     if (user) {
       await loadLearning(user.id);
     }
@@ -270,6 +288,7 @@ export function PlatformShell() {
   );
   const hasAnsweredCurrentRound = Boolean(joinedParticipantId && selectedSession?.answers[joinedParticipantId] !== undefined);
 
+  const feedbackCase = trainingFeedback?.caseData;
   const teacherList = users.filter((item) => item.role === 'teacher');
   const contributorCases = cases.filter((item) => item.status === 'pending_review');
 
@@ -310,18 +329,23 @@ export function PlatformShell() {
                 <label htmlFor="login-email" className="mb-2 block text-sm text-white/70">E-mail</label>
                 <Input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="border-white/20 bg-white/10 text-white placeholder:text-white/50" />
               </div>
+              {registerMode ? <div>
+                <label htmlFor="account-name" className="mb-2 block text-sm text-white/70">Nome</label>
+                <Input id="account-name" autoComplete="name" value={accountName} onChange={(event) => setAccountName(event.target.value)} className="border-white/20 bg-white/10 text-white" />
+              </div> : null}
               <div>
-                <label htmlFor="login-role" className="mb-2 block text-sm text-white/70">Perfil</label>
-                <select id="login-role" value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="h-11 w-full rounded-2xl border border-white/20 bg-white/10 px-4 text-sm text-white outline-none">
-                  <option value="teacher" className="text-black">Professor</option>
-                  <option value="student" className="text-black">Aluno</option>
-                </select>
+                <label htmlFor="login-password" className="mb-2 block text-sm text-white/70">Senha</label>
+                <Input id="login-password" type="password" autoComplete={registerMode ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} className="border-white/20 bg-white/10 text-white" />
               </div>
+              {registerMode ? <p className="text-sm text-white/70">Crie uma conta de aluno com uma senha de 15 a 128 caracteres.</p> : null}
               <Button variant="accent" className="w-full" onClick={handleLogin} disabled={loading}>
-                {loading ? 'Entrando...' : 'Acessar'}
+                {loading ? 'Aguarde...' : registerMode ? 'Criar conta de aluno' : 'Acessar'}
               </Button>
-              <p className="text-sm text-white/70">Sugestões: `marina@ecgedu.com` para professor, `lucas@ecgedu.com` para aluno.</p>
+              <Button variant="outline" className="w-full" onClick={() => { setRegisterMode((prev) => !prev); setStatusMessage(''); }}>
+                {registerMode ? 'Já tenho conta' : 'Quero criar uma conta'}
+              </Button>
               </>}
+              {statusMessage ? <p role="status" className="text-sm text-white/85">{statusMessage}</p> : null}
               <p className="rounded-2xl border border-white/15 bg-white/10 p-3 text-xs leading-relaxed text-white/75">Uso exclusivamente educacional. O ECG Edu não fornece diagnóstico, prescrição ou decisão clínica e não substitui avaliação profissional.</p>
             </div>
           </section>
@@ -365,10 +389,13 @@ export function PlatformShell() {
                 <QuickStat icon={Users} label="Alunos ativos" value={metrics?.activeStudents ?? 0} />
                 <QuickStat icon={ShieldCheck} label="Pendentes" value={metrics?.pendingCases ?? 0} />
               </div>
-              <Button variant="outline" className="mt-6 w-full border-white/15 bg-white/10 text-white hover:bg-white/20" onClick={() => {
-                window.localStorage.removeItem('ecg-user');
-                setUser(null);
-              }}>
+              <Button variant="outline" className="mt-6 w-full border-white/15 bg-white/10 text-white hover:bg-white/20" onClick={() => void (async () => {
+                try {
+                  if (publicDemo) { try { window.localStorage.removeItem('ecg-user'); } catch {} }
+                  else await api.logout();
+                  clearSession();
+                } catch (error) { setStatusMessage(error instanceof Error ? error.message : 'Falha ao encerrar sessão'); }
+              })()}>
                 Encerrar sessão
               </Button>
             </Card>
@@ -377,7 +404,7 @@ export function PlatformShell() {
 
         {statusMessage ? <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-panel">{statusMessage}</p> : null}
         <p className="mt-4 rounded-2xl border border-border bg-muted px-4 py-3 text-xs leading-relaxed text-foreground/70">Conteúdo para treinamento educacional. Não utilize a plataforma para diagnóstico, prescrição ou tomada de decisão assistencial.</p>
-        <p className="mt-2 text-sm text-foreground/70">{publicDemo ? 'Demo pública com exemplos fictícios. Progresso e alterações salvos somente neste navegador. Aulas ao vivo não estão disponíveis.' : `Ambiente de demonstração: o acesso por e-mail ainda não verifica identidade.${capabilities?.storage === 'postgresql' ? ' Seu histórico será preservado. Aulas ao vivo indisponíveis nesta etapa.' : ' Seu histórico é temporário neste modo.'}`}</p>
+        <p className="mt-2 text-sm text-foreground/70">{publicDemo ? 'Demo pública com exemplos fictícios. Progresso e alterações salvos somente neste navegador. Aulas ao vivo não estão disponíveis.' : `Ambiente de desenvolvimento. Aulas ao vivo indisponíveis nesta etapa.${capabilities?.storage === 'postgresql' ? ' Seu histórico será preservado.' : ' Dados e contas são temporários neste modo.'}`}</p>
         {publicDemo && <Button variant="outline" className="mt-2" onClick={() => void api.resetDemo().then(() => window.location.reload())}>Reiniciar demo</Button>}
 
         <section className="mt-6 space-y-6">
@@ -412,8 +439,8 @@ export function PlatformShell() {
 
           {activeTab === 'cases' && (
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <Card className="p-6 md:p-8">
-                <p className="text-sm uppercase tracking-[0.24em] text-foreground/50">CRUD de casos</p>
+              {user.role === 'teacher' ? <Card className="p-6 md:p-8">
+                <p className="text-sm uppercase tracking-[0.24em] text-foreground/50">Cadastro de casos</p>
                 <h2 className="mt-3 font-display text-3xl text-secondary">{editingId ? 'Editar caso' : 'Novo caso clínico'}</h2>
                 <div className="mt-6 space-y-4">
                   <Input placeholder="Título do caso" value={caseForm.title} onChange={(event) => setCaseForm((prev) => ({ ...prev, title: event.target.value }))} />
@@ -441,7 +468,7 @@ export function PlatformShell() {
                   <Input placeholder="URL verificável da referência clínica" value={caseForm.referenceUrl} onChange={(event) => setCaseForm((prev) => ({ ...prev, referenceUrl: event.target.value }))} />
                   <p className="text-xs leading-relaxed text-foreground/60">Para publicação, informe título, organização responsável e URL verificável da referência. Caso contrário, o caso permanece em revisão.</p>
                   <div className="flex flex-wrap gap-3">
-                    <Button variant="accent" onClick={() => void submitCaseForm()}>
+                    <Button variant="accent" onClick={() => void safeAction(submitCaseForm)}>
                       {editingId ? 'Salvar alterações' : 'Cadastrar caso'}
                     </Button>
                     {editingId ? (
@@ -454,7 +481,7 @@ export function PlatformShell() {
                     ) : null}
                   </div>
                 </div>
-              </Card>
+              </Card> : null}
 
               <div className="space-y-4">
                 {cases.map((item) => (
@@ -472,19 +499,19 @@ export function PlatformShell() {
                         </div>
                         <h3 className="mt-3 font-display text-2xl text-secondary">{item.title}</h3>
                         <p className="mt-3 text-sm text-foreground/75">{item.clinicalDescription}</p>
-                        <p className="mt-3 text-sm"><strong>Diagnóstico:</strong> {item.diagnosis}</p>
-                        <p className="mt-2 text-sm text-foreground/72">{item.explanation}</p>
-                        {item.imageSource ? <p className="mt-2 text-xs text-foreground/55"><strong>Imagem:</strong> {item.imageSource}</p> : null}
-                        {item.references?.[0] ? <p className="mt-2 text-xs text-foreground/60"><strong>Fonte:</strong> <a className="underline" href={item.references[0].url} target="_blank" rel="noreferrer">{item.references[0].title}</a></p> : null}
+                        {'diagnosis' in item ? <p className="mt-3 text-sm"><strong>Diagnóstico:</strong> {item.diagnosis}</p> : null}
+                        <p className="mt-2 text-sm text-foreground/72">{'explanation' in item ? item.explanation : ''}</p>
+                        {'imageSource' in item && item.imageSource ? <p className="mt-2 text-xs text-foreground/55"><strong>Imagem:</strong> {item.imageSource}</p> : null}
+                        {'references' in item && item.references?.[0] ? <p className="mt-2 text-xs text-foreground/60"><strong>Fonte:</strong> <a className="underline" href={item.references[0].url} target="_blank" rel="noreferrer">{item.references[0].title}</a></p> : null}
                         <div className="mt-4 flex flex-wrap gap-2">
                           {item.tags.map((tag) => (
                             <span key={tag} className="rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/60">#{tag}</span>
                           ))}
                         </div>
-                        <div className="mt-5 flex flex-wrap gap-3">
+                        {user.role === 'teacher' && 'diagnosis' in item && item.createdBy === user.id ? <div className="mt-5 flex flex-wrap gap-3">
                           <Button variant="outline" size="sm" onClick={() => startEdit(item)}>Editar</Button>
-                          <Button variant="ghost" size="sm" onClick={() => void removeCase(item.id)}>Excluir</Button>
-                        </div>
+                          <Button variant="ghost" size="sm" onClick={() => void safeAction(() => removeCase(item.id))}>Excluir</Button>
+                        </div> : null}
                       </div>
                     </div>
                   </Card>
@@ -592,7 +619,7 @@ export function PlatformShell() {
                 </div>
                 <div className="p-6 md:p-8">
                   <Badge>{training.caseData.level}</Badge>
-                  <h2 className="mt-3 font-display text-3xl text-secondary">{trainingFeedback ? training.caseData.title : 'Interprete o ECG'}</h2>
+                  <h2 className="mt-3 font-display text-3xl text-secondary">{feedbackCase?.title ?? 'Interprete o ECG'}</h2>
                   <p className="mt-4 text-sm text-foreground/72">{training.caseData.clinicalDescription}</p>
                 </div>
               </Card>
@@ -616,34 +643,34 @@ export function PlatformShell() {
                   ))}
                 </div>
                 <div className="mt-6 flex flex-wrap gap-3">
-                  <Button variant="accent" onClick={() => void submitTrainingAnswer()} disabled={!selectedTrainingAnswer}>Responder</Button>
+                  <Button variant="accent" onClick={() => void safeAction(submitTrainingAnswer)} disabled={!selectedTrainingAnswer}>Responder</Button>
                   <Button variant="outline" onClick={() => setTrainingIndex((prev) => prev + 1)}>Próximo caso</Button>
                 </div>
                 {trainingFeedback ? (
                   <div className={cn('mt-6 rounded-[28px] p-5', trainingFeedback.isCorrect ? 'bg-[#dcefdc]' : 'bg-[#f4d8ca]')}>
                     <p className="font-semibold text-secondary">{trainingFeedback.isCorrect ? 'Resposta correta' : 'Resposta incorreta'}</p>
                     <p className="mt-3 text-sm text-foreground/75">{trainingFeedback.explanation}</p>
-                    <p className="mt-3 text-sm"><strong>Diagnóstico provável:</strong> {training.caseData.diagnosis}</p>
-                    {training.caseData.interpretation ? (
+                    <p className="mt-3 text-sm"><strong>Diagnóstico provável:</strong> {feedbackCase?.diagnosis}</p>
+                    {feedbackCase?.interpretation ? (
                       <div className="mt-5 border-t border-black/10 pt-4">
                         <p className="font-semibold text-secondary">Interpretação passo a passo</p>
                         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                          <div><dt className="font-semibold">Frequência</dt><dd className="text-foreground/70">{training.caseData.interpretation.rate}</dd></div>
-                          <div><dt className="font-semibold">Ritmo</dt><dd className="text-foreground/70">{training.caseData.interpretation.rhythm}</dd></div>
-                          <div><dt className="font-semibold">Eixo</dt><dd className="text-foreground/70">{training.caseData.interpretation.axis}</dd></div>
-                          <div><dt className="font-semibold">Intervalos</dt><dd className="text-foreground/70">{training.caseData.interpretation.intervals}</dd></div>
-                          <div><dt className="font-semibold">Ondas</dt><dd className="text-foreground/70">{training.caseData.interpretation.waves}</dd></div>
-                          <div><dt className="font-semibold">Segmentos</dt><dd className="text-foreground/70">{training.caseData.interpretation.segments}</dd></div>
+                          <div><dt className="font-semibold">Frequência</dt><dd className="text-foreground/70">{feedbackCase.interpretation.rate}</dd></div>
+                          <div><dt className="font-semibold">Ritmo</dt><dd className="text-foreground/70">{feedbackCase.interpretation.rhythm}</dd></div>
+                          <div><dt className="font-semibold">Eixo</dt><dd className="text-foreground/70">{feedbackCase.interpretation.axis}</dd></div>
+                          <div><dt className="font-semibold">Intervalos</dt><dd className="text-foreground/70">{feedbackCase.interpretation.intervals}</dd></div>
+                          <div><dt className="font-semibold">Ondas</dt><dd className="text-foreground/70">{feedbackCase.interpretation.waves}</dd></div>
+                          <div><dt className="font-semibold">Segmentos</dt><dd className="text-foreground/70">{feedbackCase.interpretation.segments}</dd></div>
                         </dl>
-                        <p className="mt-4 text-sm"><strong>Síntese:</strong> {training.caseData.interpretation.summary}</p>
+                        <p className="mt-4 text-sm"><strong>Síntese:</strong> {feedbackCase.interpretation.summary}</p>
                       </div>
                     ) : null}
-                    {training.caseData.differentialDiagnoses?.length ? <p className="mt-4 text-sm"><strong>Diferenciais:</strong> {training.caseData.differentialDiagnoses.join('; ')}</p> : null}
-                    {training.caseData.references?.length ? (
+                    {feedbackCase?.differentialDiagnoses?.length ? <p className="mt-4 text-sm"><strong>Diferenciais:</strong> {feedbackCase.differentialDiagnoses.join('; ')}</p> : null}
+                    {feedbackCase?.references?.length ? (
                       <div className="mt-4 text-sm">
                         <strong>Referências:</strong>
                         <ul className="mt-2 list-disc space-y-1 pl-5">
-                          {training.caseData.references.map((reference) => <li key={reference.url}><a className="underline" href={reference.url} target="_blank" rel="noreferrer">{reference.title}{reference.year ? ` (${reference.year})` : ''}</a></li>)}
+                          {feedbackCase.references.map((reference) => <li key={reference.url}><a className="underline" href={reference.url} target="_blank" rel="noreferrer">{reference.title}{reference.year ? ` (${reference.year})` : ''}</a></li>)}
                         </ul>
                       </div>
                     ) : null}
@@ -716,11 +743,11 @@ export function PlatformShell() {
                   </div>
                   <div className="rounded-3xl bg-muted p-5">
                     <p className="font-semibold text-secondary">Estado de moderação</p>
-                    <p className="mt-2 text-sm text-foreground/70">Cada caso já registra `published` ou `pending_review`, preparando fila de aprovação futura.</p>
+                    <p className="mt-2 text-sm text-foreground/70">Os casos podem ser publicados ou permanecer pendentes na fila de revisão.</p>
                   </div>
                   <div className="rounded-3xl bg-muted p-5">
                     <p className="font-semibold text-secondary">Autoria preservada</p>
-                    <p className="mt-2 text-sm text-foreground/70">Todo caso mantém `createdBy`, facilitando auditoria e ranking de contribuição.</p>
+                    <p className="mt-2 text-sm text-foreground/70">Cada caso mantém seu autor, facilitando o acompanhamento das contribuições.</p>
                   </div>
                 </div>
               </Card>

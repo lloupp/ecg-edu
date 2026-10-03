@@ -133,7 +133,7 @@ export interface DashboardMetrics {
   activeStudents: number;
 }
 
-export interface LoginPayload {
-  email: string;
-  role: UserRole;
-}
+export interface LoginPayload { email: string; password: string; }
+export type CasePreview = Pick<ClinicalCase, 'id' | 'title' | 'ecgImageUrl' | 'clinicalDescription' | 'level' | 'status' | 'tags' | 'createdBy' | 'liveQuestionId'>;
+export type TrainingQuestionView = { question: Omit<LiveQuestion, 'correctAnswer'>; caseData: CasePreview };
+export type TrainingFeedback = TrainingAttempt & { caseData?: ClinicalCase };
