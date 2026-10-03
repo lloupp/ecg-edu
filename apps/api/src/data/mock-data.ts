@@ -34,7 +34,7 @@ export const casesSeed: ClinicalCase[] = [
     title: 'Fibrilação atrial com resposta ventricular rápida',
     ecgImageUrl: '/ecgs/ecg-af.svg',
     ecgImageKind: 'schematic',
-    imageSource: 'Ilustração didática própria do ECG Edu; não representa traçado clínico de paciente.',
+    imageSource: 'Ilustração vetorial didática incluída no repositório; não representa traçado clínico de paciente.',
     clinicalDescription: 'Paciente fictício de 72 anos com palpitações, dispneia leve e antecedente de hipertensão arterial.',
     diagnosis: 'Fibrilação atrial com resposta ventricular rápida',
     explanation:
@@ -67,8 +67,6 @@ export const casesSeed: ClinicalCase[] = [
         url: 'https://www.escardio.org/guidelines/clinical-practice-guidelines/all-esc-practice-guidelines/atrial-fibrillation/',
       },
     ],
-    reviewedBy: 'u-teacher-1',
-    lastReviewedAt: '2026-09-23',
   },
   {
     id: 'case-stemi',
@@ -76,7 +74,7 @@ export const casesSeed: ClinicalCase[] = [
     title: 'Elevação do ST em derivações inferiores',
     ecgImageUrl: '/ecgs/ecg-stemi.svg',
     ecgImageKind: 'schematic',
-    imageSource: 'Ilustração didática própria do ECG Edu; não representa traçado clínico de paciente.',
+    imageSource: 'Ilustração vetorial didática incluída no repositório; não representa traçado clínico de paciente.',
     clinicalDescription: 'Paciente fictício de 58 anos com dor torácica opressiva, sudorese e náuseas.',
     diagnosis: 'Padrão eletrocardiográfico compatível com IAM com supra de ST inferior no contexto apresentado',
     explanation:
@@ -109,8 +107,6 @@ export const casesSeed: ClinicalCase[] = [
         url: 'https://www.escardio.org/guidelines/clinical-practice-guidelines/all-esc-practice-guidelines/acute-coronary-syndromes/',
       },
     ],
-    reviewedBy: 'u-teacher-1',
-    lastReviewedAt: '2026-09-23',
   },
   {
     id: 'case-brugada',
@@ -118,7 +114,7 @@ export const casesSeed: ClinicalCase[] = [
     title: 'Padrão eletrocardiográfico de Brugada tipo 1',
     ecgImageUrl: '/ecgs/ecg-brugada.svg',
     ecgImageKind: 'schematic',
-    imageSource: 'Ilustração didática própria do ECG Edu; não representa traçado clínico de paciente.',
+    imageSource: 'Ilustração vetorial didática incluída no repositório; não representa traçado clínico de paciente.',
     clinicalDescription: 'Paciente fictício de 34 anos com síncope noturna e antecedente familiar de morte súbita.',
     diagnosis: 'Padrão eletrocardiográfico de Brugada tipo 1',
     explanation:
@@ -151,8 +147,6 @@ export const casesSeed: ClinicalCase[] = [
         url: 'https://www.escardio.org/guidelines/clinical-practice-guidelines/all-esc-practice-guidelines/ventricular-arrhythmias-and-the-prevention-of-sudden-cardiac-death/',
       },
     ],
-    reviewedBy: 'u-teacher-1',
-    lastReviewedAt: '2026-09-23',
   },
 ];
 
