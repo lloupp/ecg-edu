@@ -404,12 +404,12 @@ export function PlatformShell() {
                   <Input placeholder="Diagnóstico correto" value={caseForm.diagnosis} onChange={(event) => setCaseForm((prev) => ({ ...prev, diagnosis: event.target.value }))} />
                   <Textarea placeholder="Explicação" value={caseForm.explanation} onChange={(event) => setCaseForm((prev) => ({ ...prev, explanation: event.target.value }))} />
                   <div className="grid gap-4 md:grid-cols-2">
-                    <select value={caseForm.level} onChange={(event) => setCaseForm((prev) => ({ ...prev, level: event.target.value as ClinicalCase['level'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm">
+                    <select aria-label="Nível de dificuldade do caso" value={caseForm.level} onChange={(event) => setCaseForm((prev) => ({ ...prev, level: event.target.value as ClinicalCase['level'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                       <option value="basic">Básico</option>
                       <option value="intermediate">Intermediário</option>
                       <option value="advanced">Avançado</option>
                     </select>
-                    <select value={caseForm.status} onChange={(event) => setCaseForm((prev) => ({ ...prev, status: event.target.value as ClinicalCase['status'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm">
+                    <select aria-label="Status editorial do caso" value={caseForm.status} onChange={(event) => setCaseForm((prev) => ({ ...prev, status: event.target.value as ClinicalCase['status'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                       <option value="published">Publicado</option>
                       <option value="pending_review">Pendente de revisão</option>
                     </select>
@@ -502,7 +502,7 @@ export function PlatformShell() {
                     <p className="text-sm uppercase tracking-[0.24em] text-foreground/50">Sessões</p>
                     <h3 className="mt-2 font-display text-3xl text-secondary">Painel da aula</h3>
                   </div>
-                  <select value={selectedSession?.code ?? ''} onChange={(event) => setSelectedSessionCode(event.target.value)} className="h-11 min-w-[180px] rounded-2xl border border-border bg-white px-4 text-sm">
+                  <select aria-label="Selecionar sessão ao vivo" value={selectedSession?.code ?? ''} onChange={(event) => setSelectedSessionCode(event.target.value)} className="h-11 min-w-[180px] rounded-2xl border border-border bg-white px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                     {sessions.map((session) => (
                       <option key={session.code} value={session.code}>{session.title} ({session.code})</option>
                     ))}
