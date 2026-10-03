@@ -1,4 +1,32 @@
-import { IsArray, IsIn, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import type { CompetencyCode, EcgInterpretation } from '@ecg-edu/shared';
+
+class ClinicalReferenceDto {
+  @IsString()
+  title!: string;
+
+  @IsString()
+  organization!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1900)
+  year?: number;
+
+  @IsUrl({ require_protocol: true })
+  url!: string;
+}
 
 export class UpsertCaseDto {
   @IsString()
@@ -20,6 +48,7 @@ export class UpsertCaseDto {
   level!: 'basic' | 'intermediate' | 'advanced';
 
   @IsArray()
+  @IsString({ each: true })
   tags!: string[];
 
   @IsString()
@@ -27,6 +56,47 @@ export class UpsertCaseDto {
 
   @IsIn(['published', 'pending_review'])
   status!: 'published' | 'pending_review';
+
+  @IsOptional()
+  @IsIn(['schematic', 'deidentified_clinical'])
+  ecgImageKind?: 'schematic' | 'deidentified_clinical';
+
+  @IsOptional()
+  @IsString()
+  imageSource?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  learningObjectives?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(['rate', 'rhythm', 'axis', 'intervals', 'waves', 'segments', 'diagnosis', 'differential', 'clinical_context'], { each: true })
+  competencies?: CompetencyCode[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  differentialDiagnoses?: string[];
+
+  @IsOptional()
+  @IsObject()
+  interpretation?: EcgInterpretation;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ClinicalReferenceDto)
+  references?: ClinicalReferenceDto[];
+
+  @IsOptional()
+  @IsString()
+  reviewedBy?: string;
+
+  @IsOptional()
+  @IsString()
+  lastReviewedAt?: string;
 }
 
 export class UpdateCaseDto {
@@ -56,6 +126,7 @@ export class UpdateCaseDto {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   tags?: string[];
 
   @IsOptional()
@@ -65,4 +136,45 @@ export class UpdateCaseDto {
   @IsOptional()
   @IsIn(['published', 'pending_review'])
   status?: 'published' | 'pending_review';
+
+  @IsOptional()
+  @IsIn(['schematic', 'deidentified_clinical'])
+  ecgImageKind?: 'schematic' | 'deidentified_clinical';
+
+  @IsOptional()
+  @IsString()
+  imageSource?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  learningObjectives?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(['rate', 'rhythm', 'axis', 'intervals', 'waves', 'segments', 'diagnosis', 'differential', 'clinical_context'], { each: true })
+  competencies?: CompetencyCode[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  differentialDiagnoses?: string[];
+
+  @IsOptional()
+  @IsObject()
+  interpretation?: EcgInterpretation;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ClinicalReferenceDto)
+  references?: ClinicalReferenceDto[];
+
+  @IsOptional()
+  @IsString()
+  reviewedBy?: string;
+
+  @IsOptional()
+  @IsString()
+  lastReviewedAt?: string;
 }

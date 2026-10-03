@@ -12,9 +12,9 @@
   },
   "dependencies": {
     "@ecg-edu/shared": "0.0.1",
-    "@nestjs/common": "^11.0.1",
-    "@nestjs/core": "^11.0.1",
-    "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/common": "11.2.6",
+    "@nestjs/core": "11.2.6",
+    "@nestjs/platform-express": "11.2.6",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "reflect-metadata": "^0.2.2",
@@ -23,7 +23,7 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
-    "@nestjs/testing": "^11.0.1",
+    "@nestjs/testing": "11.2.6",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.2",
     "@types/supertest": "^6.0.2",
@@ -34,16 +34,27 @@
     "typescript": "^5.7.2"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": ".",
     "testRegex": "test/.*\\.(e2e-)?spec\\.ts$",
     "transform": {
-      "^.+\\.ts$": ["ts-jest", { "isolatedModules": true }]
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "isolatedModules": true
+        }
+      ]
     },
     "moduleNameMapper": {
       "^@ecg-edu/shared$": "<rootDir>/../../packages/shared/src"
     },
     "testEnvironment": "node",
-    "collectCoverageFrom": ["src/**/*.ts"]
+    "collectCoverageFrom": [
+      "src/**/*.ts"
+    ]
   }
 }

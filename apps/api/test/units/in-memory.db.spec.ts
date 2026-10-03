@@ -68,4 +68,64 @@ describe('InMemoryDatabase', () => {
       expect(metrics.activeStudents).toBe(2);
     });
   });
+
+
+  describe('clinical content governance', () => {
+    it('mantém caso sem referência em revisão mesmo se publicação for solicitada', () => {
+      const created = db.createCase({
+        title: 'Caso sem fonte',
+        ecgImageUrl: '/ecgs/ecg-af.svg',
+        clinicalDescription: 'descricao',
+        diagnosis: 'DX',
+        explanation: 'explicacao',
+        level: 'basic',
+        tags: ['teste'],
+        createdBy: 'u-teacher-1',
+        status: 'published',
+        references: [],
+      });
+
+      expect(created.status).toBe('pending_review');
+    });
+
+    it('permite publicar caso com referência clínica registrada', () => {
+      const created = db.createCase({
+        title: 'Caso com fonte',
+        ecgImageUrl: '/ecgs/ecg-af.svg',
+        clinicalDescription: 'descricao',
+        diagnosis: 'DX',
+        explanation: 'explicacao',
+        level: 'basic',
+        tags: ['teste'],
+        createdBy: 'u-teacher-1',
+        status: 'published',
+        references: [{ title: 'Diretriz', organization: 'Sociedade médica', url: 'https://example.org/guideline' }],
+      });
+
+      expect(created.status).toBe('published');
+    });
+  });
+
+  describe('learning progress', () => {
+    it('registra tentativa por usuário, atualiza domínio e inclui erro na revisão', () => {
+      const attempt = db.evaluateTraining('q-af', 'resposta incorreta', 'u-student-1');
+      const progress = db.learningProgress('u-student-1');
+      const review = db.reviewErrors('u-student-1');
+
+      expect(attempt?.isCorrect).toBe(false);
+      expect(progress.totalAttempts).toBe(1);
+      expect(progress.accuracy).toBe(0);
+      expect(progress.competencies.find((item) => item.code === 'rhythm')?.attempts).toBe(1);
+      expect(review).toHaveLength(1);
+      expect(review[0].caseData.id).toBe('case-af');
+    });
+
+    it('remove o caso da revisão de erros quando a tentativa mais recente é correta', () => {
+      db.evaluateTraining('q-af', 'errada', 'u-student-1');
+      db.evaluateTraining('q-af', 'Fibrilação atrial', 'u-student-1');
+
+      expect(db.reviewErrors('u-student-1')).toHaveLength(0);
+      expect(db.learningProgress('u-student-1').accuracy).toBe(50);
+    });
+  });
 });

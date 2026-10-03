@@ -64,7 +64,7 @@ describe('LiveService (F2)', () => {
 
     service.advance(session.code, 'u-teacher-1');
     expect(() =>
-      service.answer(session.code, { participantId, answer: 'Ativar protocolo de reperfusão' }),
+      service.answer(session.code, { participantId, answer: 'Elevação do ST em derivações inferiores' }),
     ).not.toThrow();
 
     const score = db.findSessionByCode(session.code)!.participants.find((p) => p.id === participantId)!.score;

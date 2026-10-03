@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import { ClinicalCase, DashboardMetrics, UserProfile, UserRole } from '@ecg-edu/shared';
+import { ClinicalCase, DashboardMetrics, LearningProgress, UserProfile, UserRole } from '@ecg-edu/shared';
 import { Activity, BookOpenText, CirclePlay, Gauge, HeartPulse, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ const navigation = [
   { id: 'cases', label: 'Banco de casos' },
   { id: 'live', label: 'Aula ao vivo' },
   { id: 'training', label: 'Treino' },
+  { id: 'progress', label: 'Meu progresso' },
   { id: 'community', label: 'Colaboração' },
 ] as const;
 
@@ -31,7 +32,13 @@ const emptyCaseForm = {
   explanation: '',
   level: 'basic' as ClinicalCase['level'],
   tags: 'arritmia',
-  status: 'published' as ClinicalCase['status'],
+  status: 'pending_review' as ClinicalCase['status'],
+  imageSource: 'Ilustração didática própria ou ECG desidentificado com autorização de uso.',
+  learningObjectives: '',
+  differentialDiagnoses: '',
+  referenceTitle: '',
+  referenceOrganization: '',
+  referenceUrl: '',
 };
 
 export function PlatformShell() {
@@ -47,6 +54,8 @@ export function PlatformShell() {
   const [trainingIndex, setTrainingIndex] = useState(0);
   const [trainingFeedback, setTrainingFeedback] = useState<{ isCorrect: boolean; explanation: string } | null>(null);
   const [selectedTrainingAnswer, setSelectedTrainingAnswer] = useState('');
+  const [learningProgress, setLearningProgress] = useState<LearningProgress | null>(null);
+  const [reviewErrors, setReviewErrors] = useState<Awaited<ReturnType<typeof api.reviewErrors>>>([]);
   const [caseForm, setCaseForm] = useState(emptyCaseForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [liveTitle, setLiveTitle] = useState('Discussão de plantão - ECGs críticos');
@@ -68,6 +77,7 @@ export function PlatformShell() {
   useEffect(() => {
     if (user) {
       void refreshAll();
+      void loadLearning(user.id);
     }
   }, [user]);
 
@@ -89,10 +99,19 @@ export function PlatformShell() {
   }
 
   async function loadTraining(index: number) {
-    const data = await api.trainingQuestion(index);
+    if (!user) {
+      return;
+    }
+    const data = await api.trainingQuestion(index, user.id);
     setTraining(data);
     setSelectedTrainingAnswer('');
     setTrainingFeedback(null);
+  }
+
+  async function loadLearning(userId: string) {
+    const [progressData, reviewData] = await Promise.all([api.learningProgress(userId), api.reviewErrors(userId)]);
+    setLearningProgress(progressData);
+    setReviewErrors(reviewData);
   }
 
   async function handleLogin() {
@@ -114,19 +133,27 @@ export function PlatformShell() {
     if (!user) {
       return;
     }
+    const { referenceTitle, referenceOrganization, referenceUrl, learningObjectives, differentialDiagnoses, ...baseCaseForm } = caseForm;
     const payload = {
-      ...caseForm,
+      ...baseCaseForm,
       tags: caseForm.tags.split(',').map((item) => item.trim()).filter(Boolean),
       createdBy: user.id,
+      ecgImageKind: 'schematic' as const,
+      learningObjectives: learningObjectives.split(',').map((item) => item.trim()).filter(Boolean),
+      differentialDiagnoses: differentialDiagnoses.split(',').map((item) => item.trim()).filter(Boolean),
+      references: referenceTitle && referenceOrganization && referenceUrl ? [{ title: referenceTitle, organization: referenceOrganization, url: referenceUrl }] : [],
     };
 
-    if (editingId) {
-      await api.updateCase(editingId, payload);
-      setStatusMessage('Caso atualizado.');
-    } else {
-      await api.createCase(payload);
-      setStatusMessage('Novo caso cadastrado.');
-    }
+    const saved = editingId
+      ? await api.updateCase(editingId, payload)
+      : await api.createCase(payload);
+    setStatusMessage(
+      saved.status === 'pending_review' && caseForm.status === 'published'
+        ? 'Caso salvo como pendente: uma referência clínica verificável é obrigatória para publicação.'
+        : editingId
+          ? 'Caso atualizado.'
+          : 'Novo caso cadastrado.',
+    );
     setCaseForm(emptyCaseForm);
     setEditingId(null);
     await refreshAll();
@@ -143,6 +170,12 @@ export function PlatformShell() {
       level: item.level,
       tags: item.tags.join(', '),
       status: item.status,
+      imageSource: item.imageSource ?? '',
+      learningObjectives: item.learningObjectives?.join(', ') ?? '',
+      differentialDiagnoses: item.differentialDiagnoses?.join(', ') ?? '',
+      referenceTitle: item.references?.[0]?.title ?? '',
+      referenceOrganization: item.references?.[0]?.organization ?? '',
+      referenceUrl: item.references?.[0]?.url ?? '',
     });
     setActiveTab('cases');
   }
@@ -214,8 +247,11 @@ export function PlatformShell() {
     if (!training || !selectedTrainingAnswer) {
       return;
     }
-    const result = await api.answerTraining(training.question.id, selectedTrainingAnswer);
+    const result = await api.answerTraining(training.question.id, selectedTrainingAnswer, user?.id);
     setTrainingFeedback({ isCorrect: result.isCorrect, explanation: result.explanation });
+    if (user) {
+      await loadLearning(user.id);
+    }
   }
 
   const selectedSession = useMemo(
@@ -235,13 +271,13 @@ export function PlatformShell() {
             <Badge>ECG Edu Platform</Badge>
             <h1 className="mt-6 max-w-2xl font-display text-5xl leading-none text-secondary md:text-7xl">Ensino clínico de cardiologia em formato de plataforma.</h1>
             <p className="mt-6 max-w-xl text-base text-foreground/72 md:text-lg">
-              Banco curado de ECGs, treino com feedback imediato, sessão ao vivo com ranking e fluxo preparado para autoria colaborativa e moderação.
+              Casos didáticos de ECG com fontes verificáveis, treino com feedback, revisão de erros e acompanhamento de competências.
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               {[
-                ['Casos reais', 'ECGs com descrição, diagnóstico e explicação'],
-                ['Sessões ao vivo', 'Professor conduz, alunos respondem por código'],
-                ['Trilha de treino', 'Feedback imediato com raciocínio clínico'],
+                ['Casos curados', 'ECGs didáticos com contexto, fonte e revisão clínica'],
+                ['Interpretação estruturada', 'Frequência, ritmo, eixo, intervalos, ondas e segmentos'],
+                ['Aprendizado longitudinal', 'Feedback, revisão de erros e domínio por competência'],
               ].map(([title, text]) => (
                 <Card key={title} className="border-none bg-muted p-5 shadow-none">
                   <p className="font-semibold text-secondary">{title}</p>
@@ -270,6 +306,7 @@ export function PlatformShell() {
                 {loading ? 'Entrando...' : 'Acessar'}
               </Button>
               <p className="text-sm text-white/70">Sugestões: `marina@ecgedu.com` para professor, `lucas@ecgedu.com` para aluno.</p>
+              <p className="rounded-2xl border border-white/15 bg-white/10 p-3 text-xs leading-relaxed text-white/75">Uso exclusivamente educacional. O ECG Edu não fornece diagnóstico, prescrição ou decisão clínica e não substitui avaliação profissional.</p>
             </div>
           </section>
         </div>
@@ -289,7 +326,7 @@ export function PlatformShell() {
                 <span className="text-sm text-foreground/60">{user.institution}</span>
               </div>
               <h1 className="mt-5 max-w-3xl font-display text-4xl leading-tight text-secondary md:text-6xl">
-                Plataforma de ensino clínico com foco em raciocínio por ECG real.
+                Plataforma de treinamento clínico com raciocínio estruturado em ECG.
               </h1>
               <p className="mt-4 max-w-2xl text-base text-foreground/72 md:text-lg">
                 Banco estruturado de casos, sessões síncronas com pontuação e trilha individual para consolidar padrões eletrocardiográficos de alto valor clínico.
@@ -322,7 +359,8 @@ export function PlatformShell() {
           </div>
         </section>
 
-        {statusMessage ? <p className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-panel">{statusMessage}</p> : null}
+        {statusMessage ? <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-panel">{statusMessage}</p> : null}
+        <p className="mt-4 rounded-2xl border border-border bg-muted px-4 py-3 text-xs leading-relaxed text-foreground/70">Conteúdo para treinamento educacional. Não utilize a plataforma para diagnóstico, prescrição ou tomada de decisão assistencial.</p>
 
         <section className="mt-6 space-y-6">
           {activeTab === 'overview' && (
@@ -366,17 +404,24 @@ export function PlatformShell() {
                   <Input placeholder="Diagnóstico correto" value={caseForm.diagnosis} onChange={(event) => setCaseForm((prev) => ({ ...prev, diagnosis: event.target.value }))} />
                   <Textarea placeholder="Explicação" value={caseForm.explanation} onChange={(event) => setCaseForm((prev) => ({ ...prev, explanation: event.target.value }))} />
                   <div className="grid gap-4 md:grid-cols-2">
-                    <select value={caseForm.level} onChange={(event) => setCaseForm((prev) => ({ ...prev, level: event.target.value as ClinicalCase['level'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm">
+                    <select aria-label="Nível de dificuldade do caso" value={caseForm.level} onChange={(event) => setCaseForm((prev) => ({ ...prev, level: event.target.value as ClinicalCase['level'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                       <option value="basic">Básico</option>
                       <option value="intermediate">Intermediário</option>
                       <option value="advanced">Avançado</option>
                     </select>
-                    <select value={caseForm.status} onChange={(event) => setCaseForm((prev) => ({ ...prev, status: event.target.value as ClinicalCase['status'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm">
+                    <select aria-label="Status editorial do caso" value={caseForm.status} onChange={(event) => setCaseForm((prev) => ({ ...prev, status: event.target.value as ClinicalCase['status'] }))} className="h-11 rounded-2xl border border-border bg-white px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                       <option value="published">Publicado</option>
                       <option value="pending_review">Pendente de revisão</option>
                     </select>
                   </div>
                   <Input placeholder="Tags separadas por vírgula" value={caseForm.tags} onChange={(event) => setCaseForm((prev) => ({ ...prev, tags: event.target.value }))} />
+                  <Textarea placeholder="Objetivos de aprendizagem separados por vírgula" value={caseForm.learningObjectives} onChange={(event) => setCaseForm((prev) => ({ ...prev, learningObjectives: event.target.value }))} />
+                  <Textarea placeholder="Diagnósticos diferenciais separados por vírgula" value={caseForm.differentialDiagnoses} onChange={(event) => setCaseForm((prev) => ({ ...prev, differentialDiagnoses: event.target.value }))} />
+                  <Input placeholder="Origem/autorização da imagem" value={caseForm.imageSource} onChange={(event) => setCaseForm((prev) => ({ ...prev, imageSource: event.target.value }))} />
+                  <Input placeholder="Título da referência clínica" value={caseForm.referenceTitle} onChange={(event) => setCaseForm((prev) => ({ ...prev, referenceTitle: event.target.value }))} />
+                  <Input placeholder="Organização responsável pela referência" value={caseForm.referenceOrganization} onChange={(event) => setCaseForm((prev) => ({ ...prev, referenceOrganization: event.target.value }))} />
+                  <Input placeholder="URL verificável da referência clínica" value={caseForm.referenceUrl} onChange={(event) => setCaseForm((prev) => ({ ...prev, referenceUrl: event.target.value }))} />
+                  <p className="text-xs leading-relaxed text-foreground/60">Para publicação, informe título, organização responsável e URL verificável da referência. Caso contrário, o caso permanece em revisão.</p>
                   <div className="flex flex-wrap gap-3">
                     <Button variant="accent" onClick={() => void submitCaseForm()}>
                       {editingId ? 'Salvar alterações' : 'Cadastrar caso'}
@@ -398,7 +443,7 @@ export function PlatformShell() {
                   <Card key={item.id} className="overflow-hidden p-4 md:p-5">
                     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
                       <div className="relative min-h-[180px] overflow-hidden rounded-[24px] bg-muted">
-                        <Image src={item.ecgImageUrl} alt={item.title} fill className="object-cover" unoptimized />
+                        <Image src={item.ecgImageUrl} alt={item.title} fill className="object-contain p-2" unoptimized />
                       </div>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -411,6 +456,8 @@ export function PlatformShell() {
                         <p className="mt-3 text-sm text-foreground/75">{item.clinicalDescription}</p>
                         <p className="mt-3 text-sm"><strong>Diagnóstico:</strong> {item.diagnosis}</p>
                         <p className="mt-2 text-sm text-foreground/72">{item.explanation}</p>
+                        {item.imageSource ? <p className="mt-2 text-xs text-foreground/55"><strong>Imagem:</strong> {item.imageSource}</p> : null}
+                        {item.references?.[0] ? <p className="mt-2 text-xs text-foreground/60"><strong>Fonte:</strong> <a className="underline" href={item.references[0].url} target="_blank" rel="noreferrer">{item.references[0].title}</a></p> : null}
                         <div className="mt-4 flex flex-wrap gap-2">
                           {item.tags.map((tag) => (
                             <span key={tag} className="rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/60">#{tag}</span>
@@ -455,7 +502,7 @@ export function PlatformShell() {
                     <p className="text-sm uppercase tracking-[0.24em] text-foreground/50">Sessões</p>
                     <h3 className="mt-2 font-display text-3xl text-secondary">Painel da aula</h3>
                   </div>
-                  <select value={selectedSession?.code ?? ''} onChange={(event) => setSelectedSessionCode(event.target.value)} className="h-11 min-w-[180px] rounded-2xl border border-border bg-white px-4 text-sm">
+                  <select aria-label="Selecionar sessão ao vivo" value={selectedSession?.code ?? ''} onChange={(event) => setSelectedSessionCode(event.target.value)} className="h-11 min-w-[180px] rounded-2xl border border-border bg-white px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                     {sessions.map((session) => (
                       <option key={session.code} value={session.code}>{session.title} ({session.code})</option>
                     ))}
@@ -523,7 +570,7 @@ export function PlatformShell() {
             <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
               <Card className="overflow-hidden p-0">
                 <div className="relative min-h-[320px] bg-muted">
-                  <Image src={training.caseData.ecgImageUrl} alt={training.caseData.title} fill className="object-cover" unoptimized />
+                  <Image src={training.caseData.ecgImageUrl} alt={training.caseData.title} fill className="object-contain p-2" unoptimized />
                 </div>
                 <div className="p-6 md:p-8">
                   <Badge>{training.caseData.level}</Badge>
@@ -540,6 +587,7 @@ export function PlatformShell() {
                     <button
                       key={option}
                       onClick={() => setSelectedTrainingAnswer(option)}
+                      aria-pressed={selectedTrainingAnswer === option}
                       className={cn(
                         'rounded-3xl border px-4 py-4 text-left transition',
                         selectedTrainingAnswer === option ? 'border-accent bg-accentSoft' : 'border-border bg-white hover:border-secondary',
@@ -557,9 +605,83 @@ export function PlatformShell() {
                   <div className={cn('mt-6 rounded-[28px] p-5', trainingFeedback.isCorrect ? 'bg-[#dcefdc]' : 'bg-[#f4d8ca]')}>
                     <p className="font-semibold text-secondary">{trainingFeedback.isCorrect ? 'Resposta correta' : 'Resposta incorreta'}</p>
                     <p className="mt-3 text-sm text-foreground/75">{trainingFeedback.explanation}</p>
-                    <p className="mt-3 text-sm"><strong>Diagnóstico correto:</strong> {training.caseData.diagnosis}</p>
+                    <p className="mt-3 text-sm"><strong>Diagnóstico provável:</strong> {training.caseData.diagnosis}</p>
+                    {training.caseData.interpretation ? (
+                      <div className="mt-5 border-t border-black/10 pt-4">
+                        <p className="font-semibold text-secondary">Interpretação passo a passo</p>
+                        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                          <div><dt className="font-semibold">Frequência</dt><dd className="text-foreground/70">{training.caseData.interpretation.rate}</dd></div>
+                          <div><dt className="font-semibold">Ritmo</dt><dd className="text-foreground/70">{training.caseData.interpretation.rhythm}</dd></div>
+                          <div><dt className="font-semibold">Eixo</dt><dd className="text-foreground/70">{training.caseData.interpretation.axis}</dd></div>
+                          <div><dt className="font-semibold">Intervalos</dt><dd className="text-foreground/70">{training.caseData.interpretation.intervals}</dd></div>
+                          <div><dt className="font-semibold">Ondas</dt><dd className="text-foreground/70">{training.caseData.interpretation.waves}</dd></div>
+                          <div><dt className="font-semibold">Segmentos</dt><dd className="text-foreground/70">{training.caseData.interpretation.segments}</dd></div>
+                        </dl>
+                        <p className="mt-4 text-sm"><strong>Síntese:</strong> {training.caseData.interpretation.summary}</p>
+                      </div>
+                    ) : null}
+                    {training.caseData.differentialDiagnoses?.length ? <p className="mt-4 text-sm"><strong>Diferenciais:</strong> {training.caseData.differentialDiagnoses.join('; ')}</p> : null}
+                    {training.caseData.references?.length ? (
+                      <div className="mt-4 text-sm">
+                        <strong>Referências:</strong>
+                        <ul className="mt-2 list-disc space-y-1 pl-5">
+                          {training.caseData.references.map((reference) => <li key={reference.url}><a className="underline" href={reference.url} target="_blank" rel="noreferrer">{reference.title}{reference.year ? ` (${reference.year})` : ''}</a></li>)}
+                        </ul>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
+              </Card>
+            </div>
+          )}
+
+          {activeTab === 'progress' && (
+            <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+              <Card className="p-6 md:p-8">
+                <p className="text-sm uppercase tracking-[0.24em] text-foreground/50">Aprendizado longitudinal</p>
+                <h2 className="mt-3 font-display text-3xl text-secondary">Meu progresso</h2>
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                  <MetricCard icon={BookOpenText} label="Tentativas" value={learningProgress?.totalAttempts ?? 0} detail="Respostas registradas no treino" />
+                  <MetricCard icon={Trophy} label="Acerto" value={learningProgress?.accuracy ?? 0} detail="Percentual global de respostas corretas" />
+                  <MetricCard icon={Gauge} label="Revisões" value={learningProgress?.dueReviews ?? 0} detail="Itens vencidos para repetição espaçada" />
+                </div>
+                <div className="mt-8 space-y-4">
+                  <div>
+                    <p className="font-semibold text-secondary">Domínio por competência</p>
+                    <p className="mt-1 text-xs leading-relaxed text-foreground/60">Indicador educacional calculado a partir das respostas registradas; não representa certificação de competência clínica profissional.</p>
+                  </div>
+                  {(learningProgress?.competencies ?? []).map((item) => (
+                    <div key={item.code}>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span>{item.label}</span>
+                        <span className="font-semibold">{item.mastery}% · {item.attempts} tentativas</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${item.mastery}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+              <Card className="p-6 md:p-8">
+                <p className="text-sm uppercase tracking-[0.24em] text-foreground/50">Revisão de erros</p>
+                <h3 className="mt-3 font-display text-3xl text-secondary">Casos para revisar</h3>
+                <div className="mt-6 space-y-4">
+                  {reviewErrors.map((item) => (
+                    <div key={item.lastAttempt.id} className="rounded-3xl border border-border bg-white p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-secondary">{item.caseData.title}</p>
+                        <Badge>{item.caseData.level}</Badge>
+                      </div>
+                      <p className="mt-3 text-sm text-foreground/70">Sua resposta: {item.lastAttempt.selectedAnswer}</p>
+                      <p className="mt-2 text-sm"><strong>Revisar:</strong> {item.lastAttempt.explanation}</p>
+                      <Button className="mt-4" variant="outline" size="sm" onClick={() => { setActiveTab('training'); setTrainingIndex(0); }}>
+                        Voltar ao treino
+                      </Button>
+                    </div>
+                  ))}
+                  {!reviewErrors.length ? <p className="rounded-3xl bg-muted p-5 text-sm text-foreground/65">Nenhum erro pendente registrado neste perfil.</p> : null}
+                </div>
               </Card>
             </div>
           )}

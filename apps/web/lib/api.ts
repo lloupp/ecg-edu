@@ -1,4 +1,4 @@
-import { ClinicalCase, DashboardMetrics, LiveSession, LoginPayload, TrainingAttempt, UserProfile } from '@ecg-edu/shared';
+import { ClinicalCase, DashboardMetrics, LearningProgress, LearningReviewItem, LiveSession, LoginPayload, TrainingAttempt, UserProfile } from '@ecg-edu/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
@@ -46,6 +46,8 @@ export const api = {
   activateSession: (code: string, teacherId: string) => request<LiveSession & { currentQuestion?: { id: string; prompt: string; options: string[]; correctAnswer: string; caseId: string } }>(`/live/sessions/${code}/activate`, { method: 'POST', body: JSON.stringify({ teacherId }) }),
   nextSessionQuestion: (code: string, teacherId: string) => request<LiveSession & { currentQuestion?: { id: string; prompt: string; options: string[]; correctAnswer: string; caseId: string } }>(`/live/sessions/${code}/next`, { method: 'POST', body: JSON.stringify({ teacherId }) }),
   answerSession: (code: string, participantId: string, answer: string) => request<LiveSession & { currentQuestion?: { id: string; prompt: string; options: string[]; correctAnswer: string; caseId: string } }>(`/live/sessions/${code}/answer`, { method: 'POST', body: JSON.stringify({ participantId, answer }) }),
-  trainingQuestion: (index: number) => request<{ question: { id: string; prompt: string; options: string[]; correctAnswer: string; caseId: string }; caseData: ClinicalCase }>(`/training/question?index=${index}`),
-  answerTraining: (questionId: string, selectedAnswer: string) => request<TrainingAttempt>('/training/answer', { method: 'POST', body: JSON.stringify({ questionId, selectedAnswer }) }),
+  trainingQuestion: (index: number, userId?: string) => request<{ question: { id: string; prompt: string; options: string[]; correctAnswer: string; caseId: string }; caseData: ClinicalCase }>(`/training/question?index=${index}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`),
+  answerTraining: (questionId: string, selectedAnswer: string, userId?: string) => request<TrainingAttempt>('/training/answer', { method: 'POST', body: JSON.stringify({ questionId, selectedAnswer, userId }) }),
+  learningProgress: (userId: string) => request<LearningProgress>(`/training/progress?userId=${encodeURIComponent(userId)}`),
+  reviewErrors: (userId: string) => request<LearningReviewItem[]>(`/training/review?userId=${encodeURIComponent(userId)}`),
 };

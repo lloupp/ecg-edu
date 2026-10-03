@@ -3,15 +3,23 @@ import { db } from '../../data/in-memory.db';
 
 @Injectable()
 export class TrainingService {
-  next(index: number) {
-    return db.nextTrainingQuestion(index);
+  next(index: number, userId?: string) {
+    return db.nextTrainingQuestion(index, userId);
   }
 
-  answer(questionId: string, selectedAnswer: string) {
-    const result = db.evaluateTraining(questionId, selectedAnswer);
+  answer(questionId: string, selectedAnswer: string, userId?: string) {
+    const result = db.evaluateTraining(questionId, selectedAnswer, userId);
     if (!result) {
       throw new NotFoundException('Pergunta não encontrada');
     }
     return result;
+  }
+
+  progress(userId: string) {
+    return db.learningProgress(userId);
+  }
+
+  review(userId: string) {
+    return db.reviewErrors(userId);
   }
 }
