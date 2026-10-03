@@ -588,11 +588,11 @@ export function PlatformShell() {
             <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
               <Card className="overflow-hidden p-0">
                 <div className="bg-muted p-2">
-                  <Image src={training.caseData.ecgImageUrl} alt={training.caseData.title} width={1200} height={630} className="h-auto w-full object-contain" unoptimized />
+                  <Image src={training.caseData.ecgImageUrl} alt="Ilustração didática de ECG" width={1200} height={630} className="h-auto w-full object-contain" unoptimized />
                 </div>
                 <div className="p-6 md:p-8">
                   <Badge>{training.caseData.level}</Badge>
-                  <h2 className="mt-3 font-display text-3xl text-secondary">{training.caseData.title}</h2>
+                  <h2 className="mt-3 font-display text-3xl text-secondary">{trainingFeedback ? training.caseData.title : 'Interprete o ECG'}</h2>
                   <p className="mt-4 text-sm text-foreground/72">{training.caseData.clinicalDescription}</p>
                 </div>
               </Card>
