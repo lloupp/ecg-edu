@@ -1,6 +1,9 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UserProfile } from '@ecg-edu/shared';
+import { CurrentUser } from '../auth/auth.decorators';
+import { AuthGuard } from '../auth/auth.guards';
 import { TrainingService } from './training.service';
 
 class TrainingQueryDto {
@@ -9,10 +12,6 @@ class TrainingQueryDto {
   @IsInt()
   @Min(0)
   index = 0;
-
-  @IsOptional()
-  @IsString()
-  userId?: string;
 }
 
 class SubmitTrainingDto {
@@ -21,38 +20,30 @@ class SubmitTrainingDto {
 
   @IsString()
   selectedAnswer!: string;
-
-  @IsOptional()
-  @IsString()
-  userId?: string;
-}
-
-class UserLearningQueryDto {
-  @IsString()
-  userId!: string;
 }
 
 @Controller('training')
+@UseGuards(AuthGuard)
 export class TrainingController {
   constructor(private readonly trainingService: TrainingService) {}
 
   @Get('question')
-  question(@Query() query: TrainingQueryDto) {
-    return this.trainingService.next(query.index, query.userId);
+  question(@Query() query: TrainingQueryDto, @CurrentUser() user: UserProfile) {
+    return this.trainingService.next(query.index, user.id);
   }
 
   @Get('progress')
-  progress(@Query() query: UserLearningQueryDto) {
-    return this.trainingService.progress(query.userId);
+  progress(@CurrentUser() user: UserProfile) {
+    return this.trainingService.progress(user.id);
   }
 
   @Get('review')
-  review(@Query() query: UserLearningQueryDto) {
-    return this.trainingService.review(query.userId);
+  review(@CurrentUser() user: UserProfile) {
+    return this.trainingService.review(user.id);
   }
 
   @Post('answer')
-  answer(@Body() payload: SubmitTrainingDto) {
-    return this.trainingService.answer(payload.questionId, payload.selectedAnswer, payload.userId);
+  answer(@Body() payload: SubmitTrainingDto, @CurrentUser() user: UserProfile) {
+    return this.trainingService.answer(payload.questionId, payload.selectedAnswer, user.id);
   }
 }
