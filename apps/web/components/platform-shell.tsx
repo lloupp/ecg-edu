@@ -37,6 +37,7 @@ const emptyCaseForm = {
   learningObjectives: '',
   differentialDiagnoses: '',
   referenceTitle: '',
+  referenceOrganization: '',
   referenceUrl: '',
 };
 
@@ -132,7 +133,7 @@ export function PlatformShell() {
     if (!user) {
       return;
     }
-    const { referenceTitle, referenceUrl, learningObjectives, differentialDiagnoses, ...baseCaseForm } = caseForm;
+    const { referenceTitle, referenceOrganization, referenceUrl, learningObjectives, differentialDiagnoses, ...baseCaseForm } = caseForm;
     const payload = {
       ...baseCaseForm,
       tags: caseForm.tags.split(',').map((item) => item.trim()).filter(Boolean),
@@ -140,7 +141,7 @@ export function PlatformShell() {
       ecgImageKind: 'schematic' as const,
       learningObjectives: learningObjectives.split(',').map((item) => item.trim()).filter(Boolean),
       differentialDiagnoses: differentialDiagnoses.split(',').map((item) => item.trim()).filter(Boolean),
-      references: referenceTitle && referenceUrl ? [{ title: referenceTitle, organization: 'Fonte informada pelo autor', url: referenceUrl }] : [],
+      references: referenceTitle && referenceOrganization && referenceUrl ? [{ title: referenceTitle, organization: referenceOrganization, url: referenceUrl }] : [],
     };
 
     const saved = editingId
@@ -173,6 +174,7 @@ export function PlatformShell() {
       learningObjectives: item.learningObjectives?.join(', ') ?? '',
       differentialDiagnoses: item.differentialDiagnoses?.join(', ') ?? '',
       referenceTitle: item.references?.[0]?.title ?? '',
+      referenceOrganization: item.references?.[0]?.organization ?? '',
       referenceUrl: item.references?.[0]?.url ?? '',
     });
     setActiveTab('cases');
@@ -417,8 +419,9 @@ export function PlatformShell() {
                   <Textarea placeholder="Diagnósticos diferenciais separados por vírgula" value={caseForm.differentialDiagnoses} onChange={(event) => setCaseForm((prev) => ({ ...prev, differentialDiagnoses: event.target.value }))} />
                   <Input placeholder="Origem/autorização da imagem" value={caseForm.imageSource} onChange={(event) => setCaseForm((prev) => ({ ...prev, imageSource: event.target.value }))} />
                   <Input placeholder="Título da referência clínica" value={caseForm.referenceTitle} onChange={(event) => setCaseForm((prev) => ({ ...prev, referenceTitle: event.target.value }))} />
+                  <Input placeholder="Organização responsável pela referência" value={caseForm.referenceOrganization} onChange={(event) => setCaseForm((prev) => ({ ...prev, referenceOrganization: event.target.value }))} />
                   <Input placeholder="URL verificável da referência clínica" value={caseForm.referenceUrl} onChange={(event) => setCaseForm((prev) => ({ ...prev, referenceUrl: event.target.value }))} />
-                  <p className="text-xs leading-relaxed text-foreground/60">Casos sem referência permanecem em revisão mesmo quando a opção “Publicado” for selecionada.</p>
+                  <p className="text-xs leading-relaxed text-foreground/60">Para publicação, informe título, organização responsável e URL verificável da referência. Caso contrário, o caso permanece em revisão.</p>
                   <div className="flex flex-wrap gap-3">
                     <Button variant="accent" onClick={() => void submitCaseForm()}>
                       {editingId ? 'Salvar alterações' : 'Cadastrar caso'}
