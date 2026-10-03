@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, ServiceUnavailableException, Injectable, NotFoundException } from '@nestjs/common';
+import { LiveSession } from '@ecg-edu/shared';
 import { runtimeConfig } from '../../data/runtime-config';
 import { db } from '../../data/in-memory.db';
 import { AnswerSessionDto, StartSessionDto } from './live.dto';
@@ -6,7 +7,7 @@ import { AnswerSessionDto, StartSessionDto } from './live.dto';
 @Injectable()
 export class LiveService {
   private requireDemoLive() {
-    if (!runtimeConfig().liveEnabled) throw new ServiceUnavailableException('Aulas ao vivo indisponíveis no modo PostgreSQL até persistência e autenticação próprias.');
+    if (!runtimeConfig().liveEnabled) throw new ServiceUnavailableException('Aulas ao vivo indisponíveis no modo PostgreSQL até persistência e autorização próprias.');
   }
 
   list() {

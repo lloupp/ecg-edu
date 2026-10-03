@@ -17,6 +17,7 @@
     "check": "npm run typecheck && npm test && npm run build",
     "db:migrate": "node scripts/db-migrate.cjs",
     "db:seed": "npm run build -w @ecg-edu/shared && npm run build -w @ecg-edu/api && node scripts/db-seed.cjs",
+    "auth:provision": "node scripts/auth-provision.cjs",
     "test:postgres": "npm run build -w @ecg-edu/shared && npm run build -w @ecg-edu/api && node --test apps/api/test/postgres/*.test.cjs"
   },
   "overrides": {

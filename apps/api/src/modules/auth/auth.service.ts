@@ -28,13 +28,15 @@ export class AuthService {
 
   async register(payload: RegisterDto) {
     const email = payload.email.trim().toLowerCase();
+    const name = payload.name.trim();
+    if (name.length < 2) throw new ConflictException('Nome inválido');
     if (await this.repository.findAuthUserByEmail(email)) {
       throw new ConflictException('Já existe uma conta com este e-mail');
     }
     const passwordHash = await hashPassword(payload.password);
     try {
       const user = await this.repository.createStudentAccount({
-        name: payload.name.trim(),
+        name,
         email,
         passwordHash,
       });

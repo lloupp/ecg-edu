@@ -2,9 +2,9 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import { ClinicalCase, DashboardMetrics, LearningProgress, UserProfile, UserRole } from '@ecg-edu/shared';
+import { ClinicalCase, DashboardMetrics, LearningProgress, UserProfile } from '@ecg-edu/shared';
 import { Activity, BookOpenText, CirclePlay, Gauge, HeartPulse, ShieldCheck, Trophy, Users } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, authSessionStorage } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -44,15 +44,16 @@ const emptyCaseForm = {
 export function PlatformShell() {
   const [activeTab, setActiveTab] = useState<(typeof navigation)[number]['id']>('overview');
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [email, setEmail] = useState('marina@ecgedu.com');
-  const [role, setRole] = useState<UserRole>('teacher');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [cases, setCases] = useState<ClinicalCase[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [sessions, setSessions] = useState<SessionView[]>([]);
   const [training, setTraining] = useState<TrainingQuestion | null>(null);
   const [trainingIndex, setTrainingIndex] = useState(0);
-  const [trainingFeedback, setTrainingFeedback] = useState<{ isCorrect: boolean; explanation: string } | null>(null);
+  const [trainingFeedback, setTrainingFeedback] = useState<Awaited<ReturnType<typeof api.answerTraining>> | null>(null);
   const [selectedTrainingAnswer, setSelectedTrainingAnswer] = useState('');
   const [learningProgress, setLearningProgress] = useState<LearningProgress | null>(null);
   const [reviewErrors, setReviewErrors] = useState<Awaited<ReturnType<typeof api.reviewErrors>>>([]);
@@ -68,11 +69,14 @@ export function PlatformShell() {
   const [capabilities, setCapabilities] = useState<Awaited<ReturnType<typeof api.capabilities>> | null>(null);
 
   useEffect(() => {
-    const storedUser = window.localStorage.getItem('ecg-user');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser) as UserProfile;
-      setUser(parsed);
+    const stored = authSessionStorage.load();
+    if (!stored || Date.parse(stored.expiresAt) <= Date.now()) {
+      authSessionStorage.clear();
+      return;
     }
+    void api.me()
+      .then((profile) => setUser(profile))
+      .catch(() => authSessionStorage.clear());
   }, []);
 
   useEffect(() => {
@@ -89,14 +93,21 @@ export function PlatformShell() {
   }, [user, trainingIndex]);
 
   async function refreshAll() {
-    const [metricsData, casesData, usersData, sessionsData, capabilityData] = await Promise.all([api.metrics(), api.cases(), api.users(), api.sessions(), api.capabilities()]);
+    const [casesData, capabilityData] = await Promise.all([api.cases(), api.capabilities()]);
     setCapabilities(capabilityData);
-    setMetrics(metricsData);
     setCases(casesData);
-    setUsers(usersData);
+
+    const sessionsData = capabilityData.liveEnabled ? await api.sessions() : [];
     setSessions(sessionsData);
-    if (!selectedSessionCode && sessionsData[0]) {
-      setSelectedSessionCode(sessionsData[0].code);
+    if (!selectedSessionCode && sessionsData[0]) setSelectedSessionCode(sessionsData[0].code);
+
+    if (user?.role === 'teacher') {
+      const [metricsData, usersData] = await Promise.all([api.metrics(), api.users()]);
+      setMetrics(metricsData);
+      setUsers(usersData);
+    } else {
+      setMetrics(null);
+      setUsers([]);
     }
   }
 
@@ -104,14 +115,14 @@ export function PlatformShell() {
     if (!user) {
       return;
     }
-    const data = await api.trainingQuestion(index, user.id);
+    const data = await api.trainingQuestion(index);
     setTraining(data);
     setSelectedTrainingAnswer('');
     setTrainingFeedback(null);
   }
 
-  async function loadLearning(userId: string) {
-    const [progressData, reviewData] = await Promise.all([api.learningProgress(userId), api.reviewErrors(userId)]);
+  async function loadLearning(_userId?: string) {
+    const [progressData, reviewData] = await Promise.all([api.learningProgress(), api.reviewErrors()]);
     setLearningProgress(progressData);
     setReviewErrors(reviewData);
   }
@@ -120,12 +131,27 @@ export function PlatformShell() {
     setLoading(true);
     setStatusMessage('');
     try {
-      const response = await api.login({ email, role });
+      const response = await api.login({ email, password });
+      authSessionStorage.save(response);
       setUser(response.user);
-      window.localStorage.setItem('ecg-user', JSON.stringify(response.user));
       setStatusMessage(`Sessão iniciada como ${response.user.name}.`);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : 'Falha ao autenticar');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegister() {
+    setLoading(true);
+    setStatusMessage('');
+    try {
+      const response = await api.register({ name, email, password });
+      authSessionStorage.save(response);
+      setUser(response.user);
+      setStatusMessage('Conta de aluno criada com sucesso.');
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'Falha ao criar conta');
     } finally {
       setLoading(false);
     }
@@ -139,7 +165,6 @@ export function PlatformShell() {
     const payload = {
       ...baseCaseForm,
       tags: caseForm.tags.split(',').map((item) => item.trim()).filter(Boolean),
-      createdBy: user.id,
       ecgImageKind: 'schematic' as const,
       learningObjectives: learningObjectives.split(',').map((item) => item.trim()).filter(Boolean),
       differentialDiagnoses: differentialDiagnoses.split(',').map((item) => item.trim()).filter(Boolean),
@@ -249,8 +274,8 @@ export function PlatformShell() {
     if (!training || !selectedTrainingAnswer) {
       return;
     }
-    const result = await api.answerTraining(training.question.id, selectedTrainingAnswer, user?.id);
-    setTrainingFeedback({ isCorrect: result.isCorrect, explanation: result.explanation });
+    const result = await api.answerTraining(training.question.id, selectedTrainingAnswer);
+    setTrainingFeedback(result);
     if (user) {
       await loadLearning(user.id);
     }
@@ -294,20 +319,24 @@ export function PlatformShell() {
             <h2 className="mt-4 font-display text-4xl">Entrar na plataforma</h2>
             <div className="mt-8 space-y-4">
               <div>
+                <label className="mb-2 block text-sm text-white/70">Nome</label>
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Obrigatório apenas para criar conta" className="border-white/20 bg-white/10 text-white placeholder:text-white/50" />
+              </div>
+              <div>
                 <label className="mb-2 block text-sm text-white/70">E-mail</label>
                 <Input value={email} onChange={(event) => setEmail(event.target.value)} className="border-white/20 bg-white/10 text-white placeholder:text-white/50" />
               </div>
               <div>
-                <label className="mb-2 block text-sm text-white/70">Perfil</label>
-                <select value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="h-11 w-full rounded-2xl border border-white/20 bg-white/10 px-4 text-sm text-white outline-none">
-                  <option value="teacher" className="text-black">Professor</option>
-                  <option value="student" className="text-black">Aluno</option>
-                </select>
+                <label className="mb-2 block text-sm text-white/70">Senha</label>
+                <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="border-white/20 bg-white/10 text-white placeholder:text-white/50" />
               </div>
-              <Button variant="accent" className="w-full" onClick={handleLogin} disabled={loading}>
-                {loading ? 'Entrando...' : 'Acessar'}
+              <Button variant="accent" className="w-full" onClick={handleLogin} disabled={loading || !email || password.length < 12}>
+                {loading ? 'Processando...' : 'Entrar'}
               </Button>
-              <p className="text-sm text-white/70">Sugestões: `marina@ecgedu.com` para professor, `lucas@ecgedu.com` para aluno.</p>
+              <Button variant="outline" className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={handleRegister} disabled={loading || !name || !email || password.length < 12}>
+                Criar conta de aluno
+              </Button>
+              <p className="text-sm text-white/70">Contas docentes não são autoatribuídas: precisam ser provisionadas por um operador autorizado.</p>
               <p className="rounded-2xl border border-white/15 bg-white/10 p-3 text-xs leading-relaxed text-white/75">Uso exclusivamente educacional. O ECG Edu não fornece diagnóstico, prescrição ou decisão clínica e não substitui avaliação profissional.</p>
             </div>
           </section>
@@ -334,7 +363,11 @@ export function PlatformShell() {
                 Banco estruturado de casos, sessões síncronas com pontuação e trilha individual para consolidar padrões eletrocardiográficos de alto valor clínico.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                {navigation.filter((item) => item.id !== 'live' || capabilities?.liveEnabled !== false).map((item) => (
+                {navigation.filter((item) => {
+                  if (item.id === 'live' && capabilities?.liveEnabled === false) return false;
+                  if ((item.id === 'cases' || item.id === 'community') && user.role !== 'teacher') return false;
+                  return true;
+                }).map((item) => (
                   <Button key={item.id} variant={activeTab === item.id ? 'accent' : 'outline'} onClick={() => setActiveTab(item.id)}>
                     {item.label}
                   </Button>
@@ -352,8 +385,13 @@ export function PlatformShell() {
                 <QuickStat icon={ShieldCheck} label="Pendentes" value={metrics?.pendingCases ?? 0} />
               </div>
               <Button variant="outline" className="mt-6 w-full border-white/15 bg-white/10 text-white hover:bg-white/20" onClick={() => {
-                window.localStorage.removeItem('ecg-user');
-                setUser(null);
+                void api.logout().catch(() => undefined).finally(() => {
+                  authSessionStorage.clear();
+                  setUser(null);
+                  setMetrics(null);
+                  setCases([]);
+                  setUsers([]);
+                });
               }}>
                 Encerrar sessão
               </Button>
@@ -363,7 +401,7 @@ export function PlatformShell() {
 
         {statusMessage ? <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-panel">{statusMessage}</p> : null}
         <p className="mt-4 rounded-2xl border border-border bg-muted px-4 py-3 text-xs leading-relaxed text-foreground/70">Conteúdo para treinamento educacional. Não utilize a plataforma para diagnóstico, prescrição ou tomada de decisão assistencial.</p>
-        <p className="mt-2 text-sm text-foreground/70">Ambiente de demonstração: o acesso por e-mail ainda não verifica identidade.{capabilities?.storage === 'postgresql' ? ' Seu histórico será preservado. Aulas ao vivo indisponíveis nesta etapa.' : ' Seu histórico é temporário neste modo.'}</p>
+        <p className="mt-2 text-sm text-foreground/70">Acesso protegido por senha e sessão revogável. {capabilities?.storage === 'postgresql' ? 'Seu histórico é persistente. Aulas ao vivo permanecem bloqueadas neste modo.' : 'O modo em memória continua destinado apenas a demonstração e testes.'}</p>
 
         <section className="mt-6 space-y-6">
           {activeTab === 'overview' && (
@@ -605,30 +643,30 @@ export function PlatformShell() {
                   <Button variant="outline" onClick={() => setTrainingIndex((prev) => prev + 1)}>Próximo caso</Button>
                 </div>
                 {trainingFeedback ? (
-                  <div className={cn('mt-6 rounded-[28px] p-5', trainingFeedback.isCorrect ? 'bg-[#dcefdc]' : 'bg-[#f4d8ca]')}>
-                    <p className="font-semibold text-secondary">{trainingFeedback.isCorrect ? 'Resposta correta' : 'Resposta incorreta'}</p>
-                    <p className="mt-3 text-sm text-foreground/75">{trainingFeedback.explanation}</p>
-                    <p className="mt-3 text-sm"><strong>Diagnóstico provável:</strong> {training.caseData.diagnosis}</p>
-                    {training.caseData.interpretation ? (
+                  <div className={cn('mt-6 rounded-[28px] p-5', trainingFeedback.attempt.isCorrect ? 'bg-[#dcefdc]' : 'bg-[#f4d8ca]')}>
+                    <p className="font-semibold text-secondary">{trainingFeedback.attempt.isCorrect ? 'Resposta correta' : 'Resposta incorreta'}</p>
+                    <p className="mt-3 text-sm text-foreground/75">{trainingFeedback.feedback.explanation}</p>
+                    <p className="mt-3 text-sm"><strong>Diagnóstico provável:</strong> {trainingFeedback.feedback.diagnosis}</p>
+                    {trainingFeedback.feedback.interpretation ? (
                       <div className="mt-5 border-t border-black/10 pt-4">
                         <p className="font-semibold text-secondary">Interpretação passo a passo</p>
                         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                          <div><dt className="font-semibold">Frequência</dt><dd className="text-foreground/70">{training.caseData.interpretation.rate}</dd></div>
-                          <div><dt className="font-semibold">Ritmo</dt><dd className="text-foreground/70">{training.caseData.interpretation.rhythm}</dd></div>
-                          <div><dt className="font-semibold">Eixo</dt><dd className="text-foreground/70">{training.caseData.interpretation.axis}</dd></div>
-                          <div><dt className="font-semibold">Intervalos</dt><dd className="text-foreground/70">{training.caseData.interpretation.intervals}</dd></div>
-                          <div><dt className="font-semibold">Ondas</dt><dd className="text-foreground/70">{training.caseData.interpretation.waves}</dd></div>
-                          <div><dt className="font-semibold">Segmentos</dt><dd className="text-foreground/70">{training.caseData.interpretation.segments}</dd></div>
+                          <div><dt className="font-semibold">Frequência</dt><dd className="text-foreground/70">{trainingFeedback.feedback.interpretation.rate}</dd></div>
+                          <div><dt className="font-semibold">Ritmo</dt><dd className="text-foreground/70">{trainingFeedback.feedback.interpretation.rhythm}</dd></div>
+                          <div><dt className="font-semibold">Eixo</dt><dd className="text-foreground/70">{trainingFeedback.feedback.interpretation.axis}</dd></div>
+                          <div><dt className="font-semibold">Intervalos</dt><dd className="text-foreground/70">{trainingFeedback.feedback.interpretation.intervals}</dd></div>
+                          <div><dt className="font-semibold">Ondas</dt><dd className="text-foreground/70">{trainingFeedback.feedback.interpretation.waves}</dd></div>
+                          <div><dt className="font-semibold">Segmentos</dt><dd className="text-foreground/70">{trainingFeedback.feedback.interpretation.segments}</dd></div>
                         </dl>
-                        <p className="mt-4 text-sm"><strong>Síntese:</strong> {training.caseData.interpretation.summary}</p>
+                        <p className="mt-4 text-sm"><strong>Síntese:</strong> {trainingFeedback.feedback.interpretation.summary}</p>
                       </div>
                     ) : null}
-                    {training.caseData.differentialDiagnoses?.length ? <p className="mt-4 text-sm"><strong>Diferenciais:</strong> {training.caseData.differentialDiagnoses.join('; ')}</p> : null}
-                    {training.caseData.references?.length ? (
+                    {trainingFeedback.feedback.differentialDiagnoses.length ? <p className="mt-4 text-sm"><strong>Diferenciais:</strong> {trainingFeedback.feedback.differentialDiagnoses.join('; ')}</p> : null}
+                    {trainingFeedback.feedback.references.length ? (
                       <div className="mt-4 text-sm">
                         <strong>Referências:</strong>
                         <ul className="mt-2 list-disc space-y-1 pl-5">
-                          {training.caseData.references.map((reference) => <li key={reference.url}><a className="underline" href={reference.url} target="_blank" rel="noreferrer">{reference.title}{reference.year ? ` (${reference.year})` : ''}</a></li>)}
+                          {trainingFeedback.feedback.references.map((reference) => <li key={reference.url}><a className="underline" href={reference.url} target="_blank" rel="noreferrer">{reference.title}{reference.year ? ` (${reference.year})` : ''}</a></li>)}
                         </ul>
                       </div>
                     ) : null}

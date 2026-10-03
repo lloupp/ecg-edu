@@ -65,7 +65,9 @@ export class PostgresRepository implements AuthRepository, CasesRepository, Lear
       `SELECT ${userSelect}, password_hash AS "passwordHash" FROM users WHERE lower(email)=lower($1) LIMIT 1`,
       [email.trim().toLowerCase()],
     );
-    return rows[0] ? { user: rows[0], passwordHash: rows[0].passwordHash } : undefined;
+    if (!rows[0]) return undefined;
+    const { passwordHash, ...user } = rows[0];
+    return { user, passwordHash };
   }
 
   async createStudentAccount(input: { name: string; email: string; passwordHash: string }): Promise<UserProfile> {

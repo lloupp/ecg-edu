@@ -135,5 +135,11 @@ export interface DashboardMetrics {
 
 export interface LoginPayload {
   email: string;
-  role: UserRole;
+  password: string;
+}
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
 }

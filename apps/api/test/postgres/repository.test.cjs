@@ -47,6 +47,15 @@ const casePayload = (teacher) => ({
   references: [{ title: 'Fonte de teste, sem conteúdo clínico novo', organization: 'Teste', url: 'https://example.org/test' }], competencies: ['rhythm'],
 });
 
+async function createTestUser(email, role = 'student') {
+  const id = randomUUID();
+  await repository.pool.query(
+    "INSERT INTO users(id,name,email,role,institution,specialty) VALUES($1,$2,$3,$4,'Teste','Teste')",
+    [id, email.split('@')[0], email, role],
+  );
+  return { id, email, role };
+}
+
 test('migration and development seed are repeatable and preserve existing rows', async () => {
   const teacher = seedId('u-teacher-1');
   const created = await repository.createCase({ ...casePayload(teacher), title: "Literal '; DROP TABLE users; --" });
@@ -54,7 +63,7 @@ test('migration and development seed are repeatable and preserve existing rows',
   await seed(url);
   assert.ok((await repository.listCases()).some((c) => c.id === created.id && c.title.includes('DROP TABLE')));
   assert.equal((await repository.listUsers()).length, 3);
-  assert.equal(Number((await repository.pool.query('SELECT COUNT(*) FROM ecg_schema_migrations')).rows[0].count), 4);
+  assert.equal(Number((await repository.pool.query('SELECT COUNT(*) FROM ecg_schema_migrations')).rows[0].count), 5);
 });
 
 test('existing legacy schema and history are migrated without recreation', async () => {
@@ -71,6 +80,8 @@ test('existing legacy schema and history are migrated without recreation', async
     assert.equal(attempt.case_id, c);
     assert.equal(attempt.explanation_snapshot, 'Explicação preservada');
     assert.ok(attempt.next_review_at);
+    assert.equal((await pool.query("SELECT password_hash FROM users WHERE id=$1", [u])).rows[0].password_hash, null);
+    assert.equal((await pool.query("SELECT to_regclass('auth_sessions') AS relation")).rows[0].relation, 'auth_sessions');
     assert.equal(Number((await pool.query('SELECT COUNT(*) FROM users')).rows[0].count), 1);
   } finally { await pool.end(); }
 });
@@ -99,19 +110,19 @@ test('attempt, feedback, progress and error review survive closing and reopening
   assert.equal(progress.competencies.find((c) => c.code === 'rhythm').attempts, 1);
   assert.equal((await repository.reviewErrors(student))[0].lastAttempt.id, attempt.id);
   assert.equal((await repository.reviewErrors(student))[0].lastAttempt.explanation, attempt.explanation);
-  const other = await repository.login('other-student@example.org', 'student');
+  const other = await createTestUser('other-student@example.org');
   assert.equal((await repository.learningProgress(other.id)).totalAttempts, 0);
 });
 
 test('concurrent correct answers serialize spaced repetition intervals without lost attempts', async () => {
-  const student = await repository.login('concurrent@example.org', 'student');
+  const student = await createTestUser('concurrent@example.org');
   const attempts = await Promise.all([1,2,3].map(() => repository.evaluateTraining(seedId('q-af'), 'Fibrilação atrial', student.id)));
   assert.deepEqual(attempts.map((a) => Math.round((Date.parse(a.nextReviewAt)-Date.parse(a.answeredAt))/86400000)).sort((a,b) => a-b), [1,3,7]);
   assert.equal((await repository.learningProgress(student.id)).totalAttempts, 3);
 });
 
 test('latest attempt follows insertion order when timestamps are equal', async () => {
-  const student = await repository.login('timestamp-tie@example.org', 'student');
+  const student = await createTestUser('timestamp-tie@example.org');
   const question = seedId('q-af');
   await repository.evaluateTraining(question, 'Incorreta', student.id);
   await repository.evaluateTraining(question, 'Fibrilação atrial', student.id);
@@ -148,7 +159,7 @@ test('training rotation stays stable across independent requests', async () => {
   assert.equal((await repository.nextTrainingQuestion(0)).question.id, ids[0]);
 });
 
-test('Nest runtime uses PostgreSQL for login, cases, attempts and progress', async () => {
+test('Nest runtime uses PostgreSQL for password sessions, safe training payloads and persisted progress', async () => {
   const previous = process.env.DATABASE_URL;
   process.env.DATABASE_URL = url;
   let app;
@@ -158,13 +169,44 @@ test('Nest runtime uses PostgreSQL for login, cases, attempts and progress', asy
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
-    const login = await request(app.getHttpServer()).post('/api/auth/login').send({ email: 'runtime@example.org', role: 'student' });
-    assert.equal(login.status, 201);
-    const answer = await request(app.getHttpServer()).post('/api/training/answer').send({ questionId: seedId('q-af'), selectedAnswer: 'Fibrilação atrial', userId: login.body.user.id });
+
+    const registered = await request(app.getHttpServer()).post('/api/auth/register').send({
+      name: 'Runtime Student',
+      email: 'runtime@example.org',
+      password: 'Runtime-Test-2026!',
+    });
+    assert.equal(registered.status, 201);
+    assert.equal(registered.body.user.role, 'student');
+    assert.equal(registered.body.user.passwordHash, undefined);
+    const auth = { Authorization: `Bearer ${registered.body.token}` };
+
+    const question = await request(app.getHttpServer()).get('/api/training/question?index=0').set(auth);
+    assert.equal(question.status, 200);
+    assert.equal(question.body.question.correctAnswer, undefined);
+    assert.equal(question.body.caseData.diagnosis, undefined);
+
+    const answer = await request(app.getHttpServer())
+      .post('/api/training/answer')
+      .set(auth)
+      .send({ questionId: question.body.question.id, selectedAnswer: question.body.question.options[0] });
     assert.equal(answer.status, 201);
-    const progress = await request(app.getHttpServer()).get(`/api/training/progress?userId=${login.body.user.id}`);
+    assert.equal(answer.body.attempt.userId, registered.body.user.id);
+    assert.ok(answer.body.feedback.diagnosis);
+
+    const progress = await request(app.getHttpServer()).get('/api/training/progress').set(auth);
+    assert.equal(progress.status, 200);
+    assert.equal(progress.body.userId, registered.body.user.id);
     assert.equal(progress.body.totalAttempts, 1);
-    assert.equal((await repository.learningProgress(login.body.user.id)).totalAttempts, 1);
+    assert.equal((await repository.learningProgress(registered.body.user.id)).totalAttempts, 1);
+
+    const me = await request(app.getHttpServer()).get('/api/auth/me').set(auth);
+    assert.equal(me.status, 200);
+    assert.equal(me.body.email, 'runtime@example.org');
+
+    const logout = await request(app.getHttpServer()).post('/api/auth/logout').set(auth);
+    assert.equal(logout.status, 201);
+    assert.equal((await request(app.getHttpServer()).get('/api/auth/me').set(auth)).status, 401);
+
     const live = await request(app.getHttpServer()).post('/api/live/sessions').send({ teacherId: seedId('u-teacher-1'), title: 'Aula', questionIds: [] });
     assert.equal(live.status, 503);
   } finally {

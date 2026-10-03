@@ -156,11 +156,4 @@ export class UpdateCaseDto {
   @Type(() => ClinicalReferenceDto)
   references?: ClinicalReferenceDto[];
 
-  @IsOptional()
-  @IsString()
-  reviewedBy?: string;
-
-  @IsOptional()
-  @IsString()
-  lastReviewedAt?: string;
 }
