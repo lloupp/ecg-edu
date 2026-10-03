@@ -1,11 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ClinicalCase, LiveQuestion } from '@ecg-edu/shared';
+import { ClinicalCase } from '@ecg-edu/shared';
+import { presentQuestion } from '../../data/question-presentation';
 import { CasesRepository, LearningRepository } from '../../data/repositories/repositories';
-
-function safeQuestion(question: LiveQuestion) {
-  const { correctAnswer: _correctAnswer, ...safe } = question;
-  return safe;
-}
 
 function safeCase(caseData: ClinicalCase) {
   const {
@@ -30,7 +26,7 @@ export class TrainingService {
 
   async next(index: number, userId: string) {
     const { question, caseData } = await this.repository.nextTrainingQuestion(index, userId);
-    return { question: safeQuestion(question), caseData: safeCase(caseData) };
+    return { question: presentQuestion(question, `training:${userId}:${question.id}`), caseData: safeCase(caseData) };
   }
 
   async answer(questionId: string, selectedAnswer: string, userId: string) {
