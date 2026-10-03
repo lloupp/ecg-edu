@@ -443,7 +443,7 @@ export function PlatformShell() {
                   <Card key={item.id} className="overflow-hidden p-4 md:p-5">
                     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
                       <div className="relative min-h-[180px] overflow-hidden rounded-[24px] bg-muted">
-                        <Image src={item.ecgImageUrl} alt={item.title} fill className="object-cover" unoptimized />
+                        <Image src={item.ecgImageUrl} alt={item.title} fill className="object-contain p-2" unoptimized />
                       </div>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -570,7 +570,7 @@ export function PlatformShell() {
             <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
               <Card className="overflow-hidden p-0">
                 <div className="relative min-h-[320px] bg-muted">
-                  <Image src={training.caseData.ecgImageUrl} alt={training.caseData.title} fill className="object-cover" unoptimized />
+                  <Image src={training.caseData.ecgImageUrl} alt={training.caseData.title} fill className="object-contain p-2" unoptimized />
                 </div>
                 <div className="p-6 md:p-8">
                   <Badge>{training.caseData.level}</Badge>
@@ -646,7 +646,10 @@ export function PlatformShell() {
                   <MetricCard icon={Gauge} label="Revisões" value={learningProgress?.dueReviews ?? 0} detail="Itens vencidos para repetição espaçada" />
                 </div>
                 <div className="mt-8 space-y-4">
-                  <p className="font-semibold text-secondary">Domínio por competência</p>
+                  <div>
+                    <p className="font-semibold text-secondary">Domínio por competência</p>
+                    <p className="mt-1 text-xs leading-relaxed text-foreground/60">Indicador educacional calculado a partir das respostas registradas; não representa certificação de competência clínica profissional.</p>
+                  </div>
                   {(learningProgress?.competencies ?? []).map((item) => (
                     <div key={item.code}>
                       <div className="flex items-center justify-between gap-3 text-sm">
