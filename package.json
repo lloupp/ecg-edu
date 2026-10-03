@@ -15,5 +15,9 @@
     "test": "npm run test -w @ecg-edu/api",
     "test:e2e": "npm run test:e2e -w @ecg-edu/api",
     "check": "npm run typecheck && npm test && npm run build"
+  },
+  "overrides": {
+    "react": "19.0.8",
+    "react-dom": "19.0.8"
   }
 }
