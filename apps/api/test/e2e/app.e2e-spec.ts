@@ -42,8 +42,7 @@ describe('ECG Edu API (e2e)', () => {
     expect(me.body.passwordHash).toBeUndefined();
 
     const cases = await request(app.getHttpServer()).get('/api/cases').set(auth(studentToken));
-    expect(cases.status).toBe(200);
-    expect(cases.body.length).toBeGreaterThanOrEqual(3);
+    expect(cases.status).toBe(403);
   });
 
   it('não autentica com senha incorreta', async () => {
